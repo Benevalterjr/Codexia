@@ -1,0 +1,28 @@
+# Template de Referência para Automações
+# Copie este arquivo para criar novas automações estruturadas.
+
+meta:
+  name: "NOME_DA_AUTOMACAO" # Nome exibido no terminal durante a execução
+
+model:
+  name: "gpt-5.1-codex"     # Opcional (default: modelo atual do chat)
+
+context:
+  description: |
+    CONTEXTO: Descreva o papel da IA e o cenário geral.
+    Ex: "Você é um revisor de segurança Senior da Dyad."
+
+objective:
+  description: |
+    OBJETIVO: Descreva a tarefa específica de forma clara.
+    Ex: "Analise o código abaixo buscando por race conditions."
+
+style:
+  verbosity: "normal"       # Opções: conciso, normal, detalhado
+  foco: "detalhes técnicos" # Foco específico da resposta
+  linguagem: "português"     # Idioma da resposta
+
+quality:
+  criteria:
+    - "CRITÉRIO 1: Descreva uma regra de qualidade ou formato."
+    - "CRITÉRIO 2: Ex: 'Retorne apenas o JSON corrigido'."

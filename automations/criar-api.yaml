@@ -1,0 +1,23 @@
+meta:
+  name: "Gerador de API Python"
+  version: "1.0"
+
+model:
+  name: "gpt-5.1-codex"
+
+context:
+  description: "O usuário deseja criar uma API REST robusta usando Python e FastAPI."
+
+objective:
+  description: "Escreva um exemplo completo de uma API de produtos com CRUD básico e documentação automática."
+
+style:
+  verbosity: "detailed"
+  foco: "código limpo e melhores práticas"
+  linguagem: "português"
+
+quality:
+  criteria:
+    - "Usar Pydantic para validação"
+    - "Incluir tratamento de erros"
+    - "Separar rotas de lógica se possível"
