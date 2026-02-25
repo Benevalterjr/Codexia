@@ -13,6 +13,7 @@ const JsonTokenRepository = require('./src/infrastructure/repositories/JsonToken
 const JsonSessionRepository = require('./src/infrastructure/repositories/JsonSessionRepository');
 const AiGateway = require('./src/infrastructure/gateways/AiGateway');
 const AuthGateway = require('./src/infrastructure/gateways/AuthGateway');
+const BrowserGateway = require('./src/infrastructure/gateways/BrowserGateway');
 
 // Aplicação
 const ChatUseCase = require('./src/application/use-cases/ChatUseCase');
@@ -23,6 +24,7 @@ const tokenRepo = new JsonTokenRepository();
 const sessionRepo = new JsonSessionRepository();
 const aiGateway = new AiGateway();
 const authGateway = new AuthGateway();
+const browserGateway = new BrowserGateway();
 
 const chatUseCase = new ChatUseCase(sessionRepo, tokenRepo, aiGateway, authGateway);
 const automationUseCase = new AutomationUseCase(chatUseCase);
@@ -48,6 +50,8 @@ ${C.bold}Comandos disponíveis:${C.reset}
   ${C.cyan}/new${C.reset}        Nova conversa (limpa contexto)
   ${C.cyan}/tokens${C.reset}     Ver estado dos tokens
   ${C.cyan}/reauth${C.reset}     Refazer autenticação
+  ${C.cyan}/paste${C.reset}      Modo multiline para colar código (fim com /done)
+  ${C.cyan}/fetch${C.reset}      Buscar conteúdo de uma URL ${C.dim}(ex: /fetch https://example.com)${C.reset}
   ${C.cyan}/run${C.reset}        Executar automação YAML ${C.dim}(ex: /run criar-api.yaml [--inject])${C.reset}
   ${C.cyan}/exit${C.reset}       Sair
 
@@ -129,9 +133,6 @@ async function handleDeviceAuth() {
 async function getOrAuthToken(forceRefresh = false) {
     const token = await chatUseCase.ensureValidToken(forceRefresh);
     if (token) {
-        const tokens = tokenRepo.load();
-        const expDate = new Date(tokens.expires_at).toLocaleString('pt-BR');
-        console.log(`${C.green}✓ Token válido ${C.dim}(expira: ${expDate})${C.reset}`);
         return token;
     }
     
@@ -213,7 +214,14 @@ async function main() {
     
     let accessToken = await getOrAuthToken();
     if (!accessToken) process.exit(1);
+
+    const tokens = tokenRepo.load();
+    const expDate = new Date(tokens.expires_at).toLocaleString('pt-BR');
+    console.log(`${C.green}✓ Token válido ${C.dim}(expira: ${expDate})${C.reset}`);
     
+    let isMultiline = false;
+    let multilineBuffer = [];
+
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -225,6 +233,21 @@ async function main() {
     
     rl.on('line', async (line) => {
         const input = line.trim();
+        
+        // Handle Multiline Mode
+        if (isMultiline) {
+            if (input.toLowerCase() === '/done') {
+                isMultiline = false;
+                const fullInput = multilineBuffer.join('\n');
+                multilineBuffer = [];
+                console.log(`${C.green}✓ Bloco multiline fechado. Enviando...${C.reset}`);
+                await processInput(fullInput, rl);
+            } else {
+                multilineBuffer.push(line);
+            }
+            return;
+        }
+
         if (!input) { rl.prompt(); return; }
         
         if (input.startsWith('/')) {
@@ -232,11 +255,19 @@ async function main() {
             
             switch (cmd.toLowerCase()) {
                 case '/exit': case '/quit': case '/q':
-                    console.log(`\n${C.dim}Até logo! 👋${C.reset}\n`);
+                    console.log(`\n${C.dim}A fechar conexões...${C.reset}`);
+                    await browserGateway.close();
+                    console.log(`${C.dim}Até logo! 👋${C.reset}\n`);
                     process.exit(0);
                 case '/help': case '/h':
                     printHelp();
                     break;
+                case '/paste': case '/multiline':
+                    isMultiline = true;
+                    multilineBuffer = [];
+                    console.log(`\n${C.magenta}${C.bold}⇶ Modo Multiline ativado.${C.reset}`);
+                    console.log(`${C.dim}Cole seu texto/código e digite ${C.bold}/done${C.dim} para enviar.${C.reset}\n`);
+                    return;
                 case '/new': case '/clear':
                     chatUseCase.resetSession();
                     console.log(`\n${C.yellow}✓ Histórico e contexto resetados.${C.reset}\n`);
@@ -277,6 +308,33 @@ async function main() {
                 case '/tokens':
                     printTokenInfo();
                     break;
+                case '/fetch':
+                    if (args.length === 0) {
+                        console.log(`${C.dim}  Uso: /fetch https://exemplo.com${C.reset}\n`);
+                    } else {
+                        const url = args[0];
+                        console.log(`\n${C.cyan}🌐 Buscando conteúdo de: ${C.bold}${url}${C.reset}`);
+                        try {
+                            const content = await browserGateway.fetchPageContent(url);
+                            console.log(`${C.green}✓ Conteúdo extraído (${content.length} caracteres).${C.reset}`);
+                            console.log(`${C.dim}Enviando para o modo multiline...${C.reset}`);
+                            
+                            // Injeta no buffer multiline para o usuário revisar ou pedir algo sobre
+                            isMultiline = true;
+                            multilineBuffer = [
+                                `CONTEÚDO DA PÁGINA (${url}):`,
+                                "---",
+                                content,
+                                "---",
+                                "Por favor, analise o conteúdo acima."
+                            ];
+                            console.log(`\n${C.magenta}${C.bold}⇶ Conteúdo carregado no buffer.${C.reset}`);
+                            console.log(`${C.dim}Digite ${C.bold}/done${C.dim} para enviar à IA ou adicione mais instruções.${C.reset}\n`);
+                        } catch (err) {
+                            console.error(`${C.red}✗ Falha no fetch: ${err.message}${C.reset}`);
+                        }
+                    }
+                    break;
                 case '/reauth':
                     console.log(`${C.yellow}🔑 A reiniciar autenticação...${C.reset}`);
                     tokenRepo.delete();
@@ -290,6 +348,10 @@ async function main() {
             return;
         }
         
+        await processInput(input, rl);
+    });
+
+    async function processInput(input, rl) {
         // Chat Flow
         accessToken = await getOrAuthToken();
         let result = await chatUseCase.sendMessage(accessToken, input);
@@ -307,7 +369,7 @@ async function main() {
         }
         
         rl.prompt();
-    });
+    }
     
     rl.on('close', () => {
         console.log(`\n${C.dim}Até logo! 👋${C.reset}\n`);
