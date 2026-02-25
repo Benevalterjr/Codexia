@@ -3,6 +3,8 @@
 # Tokens e sessões (CRÍTICO: nunca versionar)
 openai_tokens.json
 openai_session.json
+codex_tokens.json
+codex_session.json
 
 # Dependências
 node_modules/

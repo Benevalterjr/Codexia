@@ -1,6 +1,6 @@
 # 🌌 Codexia 🧬
 
-> **A professional-grade Terminal Engine for OpenAI Codex & Chat models. Optimized for speed, persistence, and declarative automations.**
+> **A professional-grade Terminal Engine for Codex & Chat models. Optimized for speed, persistence, and declarative automations.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js](https://img.shields.io/badge/Node.js-v16%2B-green.svg)](https://nodejs.org/)
@@ -17,7 +17,7 @@ O **Codexia** não é apenas mais um cliente de chat. Ele é um **motor cognitiv
 - 🧊 **Motor Codex Estabilizado**: Injeção manual de histórico e controle de `system messages` para manter a IA focada.
 - ⚡ **Real-time Streaming**: Respostas geradas token por token diretamente no seu terminal.
 - 📂 **Automações Declarativas**: Execute tarefas complexas usando templates YAML em `/automations`.
-- 💾 **Sessões Persistentes**: Suas conversas e configurações são salvas automaticamente em `openai_session.json`.
+- 💾 **Sessões Persistentes**: Suas conversas e configurações são salvas automaticamente em `codex_session.json`.
 - 🔑 **Auth de Dispositivo**: Fluxo seguro de autenticação via browser (Device Code Flow).
 - 🧬 **Modo Injeção**: Injete resultados de automações diretamente no histórico da conversa ativa com `--inject`.
 
@@ -53,9 +53,11 @@ O **Codexia** não é apenas mais um cliente de chat. Ele é um **motor cognitiv
 ---
 
 ## 📐 Arquitetura
-O projeto utiliza uma arquitetura híbrida para lidar com múltiplos protocolos de API:
-- **Chat Protocol**: Chaveamento via `previous_response_id`.
-- **Codex Protocol**: Gerenciamento manual de buffer (últimas 40 mensagens) e injeção estruturada de payloads.
+O projeto utiliza **Clean Architecture** para gerenciar múltiplos protocolos e responsabilidades:
+- **Domain**: Definição de constantes e configurações globais.
+- **Infrastructure**: Repositórios para persistência local e Gateways para APIs externas.
+- **Application**: Casos de uso que orquestram a lógica de chat e automação.
+- **Interface**: Controlador via terminal robusto.
 
 Para detalhes profundos, consulte o [spec.md](spec.md).
 

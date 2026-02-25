@@ -1,4 +1,5 @@
 {
+  "name": "codexia",
   "dependencies": {
     "js-yaml": "^4.1.1"
   }
