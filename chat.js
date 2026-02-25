@@ -32,8 +32,8 @@ const automationUseCase = new AutomationUseCase(chatUseCase);
 function printBanner(model) {
     console.log(`
 ${C.cyan}╔═══════════════════════════════════════════════════╗
-║  ${C.bold}🤖 Codexia Engine${C.reset}${C.cyan} ·  Terminal Edition              ║
-║  ${C.dim}Codex API + Device Code Auth${C.reset}${C.cyan}                    ║
+║  ${C.bold}🤖 Codexia Engine${C.reset}${C.cyan} ·  Terminal Edition            ║
+║  ${C.dim}Codex API + Device Code Auth${C.reset}${C.cyan}                     ║
 ╚═══════════════════════════════════════════════════╝${C.reset}
   Modelo: ${C.bold}${C.yellow}${model}${C.reset}
   Comandos: /help, /model, /new, /tokens, /reauth, /exit
