@@ -5,6 +5,7 @@ openai_tokens.json
 openai_session.json
 codex_tokens.json
 codex_session.json
+.codex_secret
 
 # Dependências
 node_modules/
@@ -13,6 +14,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 
 # OS específicos
 .DS_Store

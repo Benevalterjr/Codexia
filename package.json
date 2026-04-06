@@ -1,7 +1,13 @@
 {
   "name": "codexia",
+  "scripts": {
+    "test": "jest"
+  },
   "dependencies": {
     "js-yaml": "^4.1.1",
     "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "jest": "^30.3.0"
   }
 }

@@ -1,25 +1,26 @@
 # 🌌 Codexia 🧬
 
-> **A professional-grade Terminal Engine for Codex & Chat models. Optimized for speed, persistence, and declarative automations.**
+> **A professional-grade Agentic Engineering Terminal. Optimized for autonomous memory, enterprise-level security, and declarative automations.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js](https://img.shields.io/badge/Node.js-v16%2B-green.svg)](https://nodejs.org/)
-[![Model](https://img.shields.io/badge/Model-gpt--5.1--codex-magenta.svg)](https://openai.com/)
+[![Security](https://img.shields.io/badge/Security-AES--256--GCM-blueviolet.svg)](https://en.wikipedia.org/wiki/Galois/Counter_Mode)
 
 ---
 
 ## 🚀 O que é a Codexia?
-O **Codexia** não é apenas mais um cliente de chat. Ele é um **motor cognitivo de terminal** projetado para desenvolvedores que precisam de precisão e automação. Ele resolve a lacuna entre os modelos de chat tradicionais e a API especializada do Codex, garantindo estabilidade de contexto e automação via YAML.
+
+O **Codexia** evoluiu de um simples cliente de chat para um **Motor de Engenharia Autônomo**. Ele é projetado para desenvolvedores que precisam de um agente capaz de gerenciar contexto técnico complexo em longas sessões, com segurança criptográfica e consciência de workspace.
 
 ---
 
-## ✨ Funcionalidades Key
-- 🧊 **Motor Codex Estabilizado**: Injeção manual de histórico e controle de `system messages` para manter a IA focada.
-- ⚡ **Real-time Streaming**: Respostas geradas token por token diretamente no seu terminal.
-- 📂 **Automações Declarativas**: Execute tarefas complexas usando templates YAML em `/automations`.
-- 💾 **Sessões Persistentes**: Suas conversas e configurações são salvas automaticamente em `codex_session.json`.
-- 🔑 **Auth de Dispositivo**: Fluxo seguro de autenticação via browser (Device Code Flow).
-- 🧬 **Modo Injeção**: Injete resultados de automações diretamente no histórico da conversa ativa com `--inject`.
+## ✨ Funcionalidades Avançadas
+
+- 🧠 **Memória Agêntica Autônoma**: A IA atua como Curadora de Memória, criando tópicos técnicos (`memory/`) e atualizando o índice (`MEMORY.md`) com autorização humana.
+- 🛡️ **Hardening de Segurança**: Tokens criptografados com **AES-256-GCM** e sandbox de arquivos que impede acesso fora do workspace por padrão.
+- 🧊 **Context Collapse**: Sistema de compressão inteligente que sumariza o histórico ao atingir 40 mensagens, mantendo a precisão sem estourar o limite de tokens.
+- 📂 **Introspecção de Workspace**: Comandos integrados para ler arquivos (`/read`), buscar documentações web (`/fetch`) e persistir mudanças (`/write`).
+- ⚡ **Real-time Streaming**: Respostas geradas token por token com suporte a modo multiline (`/paste`).
 
 ---
 
@@ -43,27 +44,31 @@ O **Codexia** não é apenas mais um cliente de chat. Ele é um **motor cognitiv
 
 ---
 
-## 💡 Comandos Rápidos
-- `/run <file>.yaml` — Executa uma automação isolada.
-- `/run <file>.yaml --inject` — Executa e injeta o resultado no seu chat atual.
-- `/model <id>` — Troca de modelo em tempo real.
-- `/new` — Limpa o histórico e inicia uma nova sessão limpa.
-- `/tokens` — Verifica o status e expiração da sua autenticação.
+## 💡 Comandos Essenciais
+
+- `/read <path>` — Lê arquivos ou pastas com validação de sandbox.
+- `/fetch <url>` — Extrai conteúdo textual de páginas web usando Playwright.
+- `/write <path>` — Escrita de arquivos sugerida pelo agente (Human-in-the-Loop).
+- `/run <file>.yaml` — Executa padrões declarativos via YAML.
+- `/model <id>` — Troca de modelo e persistência de preferência.
+- `/tokens` — Diagnóstico de autenticação criptografada.
 
 ---
 
 ## 📐 Arquitetura
-O projeto utiliza **Clean Architecture** para gerenciar múltiplos protocolos e responsabilidades:
-- **Domain**: Definição de constantes e configurações globais.
-- **Infrastructure**: Repositórios para persistência local e Gateways para APIs externas.
-- **Application**: Casos de uso que orquestram a lógica de chat e automação.
-- **Interface**: Controlador via terminal robusto.
 
-Para detalhes profundos, consulte o [spec.md](spec.md).
+O projeto utiliza **Clean Architecture** para gerenciar a complexidade de um agente autônomo:
+- **Domain**: Constantes globais e regras de validação.
+- **Infrastructure**: Gateways de API e Repositórios Criptografados.
+- **Application**: Casos de uso de Chat, Automação e Sumarização.
+- **Interface**: Roteamento desacoplado de comandos via `CommandRouter.js`.
+
+Para detalhes técnicos profundos, consulte o [spec.md](spec.md) e o [COMMANDS.md](COMMANDS.md).
 
 ---
 
 ## ⚖️ Licença
+
 Distribuído sob a licença **Apache 2.0**. Veja `LICENSE` para mais informações.
 
 ---

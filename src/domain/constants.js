@@ -21,6 +21,13 @@ const CONFIG = {
     MAX_WAIT_MS: 15 * 60 * 1000,
     TOKEN_FILE: path.join(__dirname, '../../codex_tokens.json'),
     SESSION_FILE: path.join(__dirname, '../../codex_session.json'),
+    VALID_MODELS: [
+        'gpt-5.1-codex',
+        'gpt-5.1',
+        'gpt-4.1',
+        'codex-mini-latest',
+        'gpt-5.3-codex'
+    ],
     AUTOMATIONS_DIR: path.join(__dirname, '../../automations'),
 };
 

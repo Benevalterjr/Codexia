@@ -23,6 +23,29 @@ class AiGateway {
 
         return { stream: response.body };
     }
+
+    async summarize(accessToken, messages) {
+        const response = await fetch(`${CONFIG.CODEX_API}/responses`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+                'User-Agent': 'codexia-cli/1.0.0',
+            },
+            body: JSON.stringify({
+                model: CONFIG.DEFAULT_MODEL,
+                input: messages,
+                stream: false,
+                store: false
+            })
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        // Extract text from Codex response format
+        return data.output?.[0]?.content?.[0]?.text || null;
+    }
 }
 
 module.exports = AiGateway;

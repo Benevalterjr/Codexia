@@ -24,7 +24,7 @@ class BrowserGateway {
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
             
             // Extrai o texto principal (limpa scripts e estilos)
-            const content = await page.evaluate(() => {
+            let content = await page.evaluate(() => {
                 const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
                 let node;
                 let text = '';
@@ -37,12 +37,22 @@ class BrowserGateway {
                 return text.replace(/\s\s+/g, ' ').substring(0, 5000); // Limite de 5k chars para context
             });
 
+            content = this._sanitize(content);
             await context.close();
             return content || "Não foi possível extrair conteúdo da página.";
         } catch (err) {
             await context.close();
             throw new Error(`Falha ao carregar ${url}: ${err.message}`);
         }
+    }
+
+    _sanitize(text) {
+        if (!text) return "";
+        // Remove caracteres de controle e sequências de escape ANSI/Terminal
+        return text
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove non-printable chars
+            .replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '')           // Remove ANSI escape codes
+            .trim();
     }
 
     async close() {
