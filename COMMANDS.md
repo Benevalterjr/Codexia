@@ -13,6 +13,7 @@ Exibe o menu de ajuda rápido com a lista de comandos e modelos suportados.
 Troca o modelo de IA em tempo Real.
 - **Exemplo**: `/model gpt-5.3-codex` ou `/model codex-mini-latest`
 - **Nota**: A preferência de modelo é salva automaticamente em `codex_session.json`.
+- **Configuração avançada**: Defina a variável `CODEXIA_VALID_MODELS` (separada por vírgulas) para customizar a whitelist de modelos aceitos no CLI.
 
 ### `/new` ou `/clear`
 Inicia uma **nova conversa limpa**.
@@ -46,7 +47,8 @@ Entra no modo de **colagem múltipla**.
 Persistência de arquivos via Agente ou Manual.
 - **O que faz**: Grava conteúdo em disco.
 - **Uso Agêntico**: A IA pode propor este comando para criar memórias (`memory/`) ou atualizar o índice (`MEMORY.md`).
-- **Segurança**: Requer autorização explícita (y/N) no terminal e validação de sandbox.
+- **Segurança**: Exibe preview de diff, requer autorização explícita (y/N) no terminal e validação de sandbox.
+- **Bootstrap de memória**: Se `MEMORY.md` não existir, o Codexia cria automaticamente um template padrão de índice na primeira interação de chat.
 
 ---
 
