@@ -667,7 +667,7 @@ describe('createApp', () => {
             expect(hasAgentLog).toBe(false);
         });
 
-        test('deve detectar comando /write dentro de bloco ```bash```', async () => {
+        test('deve detectar comando /write dentro de bloco ```bash``` e solicitar autorização exatamente 1 vez', async () => {
             deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
             const payload = '```bash\n/write ../bash-write.md\nconteudo vindo do bloco bash\n```';
             const mockStream = createMockStream([
@@ -682,6 +682,25 @@ describe('createApp', () => {
             const logCalls = logSpy.mock.calls.map(call => call[0]);
             const hasAgentLog = logCalls.some(log => log.includes('AGENTE:') && log.includes('../bash-write.md'));
             expect(hasAgentLog).toBe(true);
+            // REGRESSION: autorização deve ser pedida exatamente 1 vez (sem duplicação)
+            expect(mockRl.question).toHaveBeenCalledTimes(1);
+        });
+
+        test('deve deduplicar /write para o mesmo path em formatos diferentes', async () => {
+            deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
+            // Mesmo path em dois formatos: ```bash /write e ```write
+            const payload = '```bash\n/write memory/dup.md\nconteudo bash\n```\n\n```write memory/dup.md\nconteudo write\n```';
+            const mockStream = createMockStream([
+                `data: {"type":"response.output_text.delta","delta":${JSON.stringify(payload)}}\n`,
+                'data: [DONE]\n',
+            ]);
+            deps.chatUseCase.sendMessage.mockResolvedValue({ stream: mockStream });
+            mockRl.question = jest.fn((q, cb) => cb('y'));
+
+            await app.processInput('teste dedup', mockRl);
+
+            // Deve solicitar autorização apenas 1 vez (deduplicado por path)
+            expect(mockRl.question).toHaveBeenCalledTimes(1);
         });
 
         test('deve ignorar path inválido de /write sugerido pelo agente', async () => {
