@@ -88,4 +88,97 @@ describe('AiGateway', () => {
       await expect(gateway.sendMessage('token', {})).rejects.toThrow('network down');
     });
   });
+
+  describe('streamResponse — SSE Parser', () => {
+    function createMockStream(chunks) {
+        let index = 0;
+        return {
+            getReader: () => ({
+                read: async () => {
+                    if (index >= chunks.length) return { done: true };
+                    const value = new (require('util').TextEncoder)().encode(chunks[index++]);
+                    return { done: false, value };
+                },
+            }),
+        };
+    }
+
+    function createMockOutput() {
+        const calls = [];
+        return {
+            write: jest.fn(text => calls.push(text)),
+            getCalls: () => calls,
+            getFullOutput: () => calls.join(''),
+        };
+    }
+
+    test('deve parsear eventos de delta de texto corretamente', async () => {
+        const output = createMockOutput();
+        const stream = createMockStream([
+            'data: {"type":"response.output_text.delta","delta":"Hello"}\n',
+            'data: {"type":"response.output_text.delta","delta":" World"}\n',
+            'data: [DONE]\n',
+        ]);
+
+        const result = await gateway.streamResponse(stream, output);
+        expect(result.text).toBe('Hello World');
+    });
+
+    test('deve extrair responseId de response.completed', async () => {
+        const output = createMockOutput();
+        const stream = createMockStream([
+            'data: {"type":"response.output_text.delta","delta":"Hi"}\n',
+            'data: {"type":"response.completed","response":{"id":"resp_abc123"}}\n',
+            'data: [DONE]\n',
+        ]);
+
+        const result = await gateway.streamResponse(stream, output);
+        expect(result.responseId).toBe('resp_abc123');
+        expect(result.text).toBe('Hi');
+    });
+
+    test('deve extrair responseId de campo id com prefixo resp_', async () => {
+        const output = createMockOutput();
+        const stream = createMockStream([
+            'data: {"id":"resp_xyz","type":"response.output_text.delta","delta":"test"}\n',
+            'data: [DONE]\n',
+        ]);
+
+        const result = await gateway.streamResponse(stream, output);
+        expect(result.responseId).toBe('resp_xyz');
+    });
+
+    test('deve lidar com delta string sem type (formato alternativo)', async () => {
+        const output = createMockOutput();
+        const stream = createMockStream([
+            'data: {"delta":"bare delta"}\n',
+            'data: [DONE]\n',
+        ]);
+
+        const result = await gateway.streamResponse(stream, output);
+        expect(result.text).toBe('bare delta');
+    });
+
+    test('deve lidar com partes parciais JSON sem crashar', async () => {
+        const output = createMockOutput();
+        const stream = createMockStream([
+            'data: {"type":"response.output_text.del',
+            'ta","delta":"split"}\ndata: [DONE]\n',
+        ]);
+
+        const result = await gateway.streamResponse(stream, output);
+        expect(result.text).toBe('split');
+    });
+    
+    test('deve reportar erros de stream da API', async () => {
+        const output = createMockOutput();
+        const stream = createMockStream([
+            'data: {"type":"error","error":{"message":"rate limit"}}\n',
+            'data: [DONE]\n',
+        ]);
+
+        await gateway.streamResponse(stream, output);
+        expect(output.getFullOutput()).toContain('rate limit');
+    });
+  });
 });

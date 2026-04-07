@@ -1,0 +1,89 @@
+PASS tests/application/PromptBuilder.test.js
+PASS tests/interface/CommandRouter_Write.test.js
+PASS tests/infrastructure/gateways/AiGateway.test.js
+FAIL tests/application/use-cases/ContextCollapse.test.js
+  ● ChatUseCase Context Collapse › deve disparar _collapseHistory quando o histórico exceder 40 mensagens
+
+    expect(jest.fn()).toHaveBeenCalled()
+
+    Expected number of calls: >= 1
+    Received number of calls:    0
+
+    [0m [90m 41 |[39m
+     [90m 42 |[39m         [90m// Deve ter chamado summarize para as primeiras 20 mensagens[39m
+    [31m[1m>[22m[39m[90m 43 |[39m         expect(deps[33m.[39maiGateway[33m.[39msummarize)[33m.[39mtoHaveBeenCalled()[33m;[39m
+     [90m    |[39m                                          [31m[1m^[22m[39m
+     [90m 44 |[39m         
+     [90m 45 |[39m         [90m// O histórico deve agora conter:[39m
+     [90m 46 |[39m         [90m// 1. O bloco de collapse (1 msg)[39m[0m
+
+      at Object.toHaveBeenCalled (tests/application/use-cases/ContextCollapse.test.js:43:42)
+
+  ● ChatUseCase Context Collapse › deve usar fallback (slice) se o summarize falhar
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 20
+    Received: 42
+
+    [0m [90m 67 |[39m         [90m// Deve ter feito o slice das últimas 20[39m
+     [90m 68 |[39m         [90m// (42 mensagens totais, slice das últimas 20 = 20)[39m
+    [31m[1m>[22m[39m[90m 69 |[39m         expect(uc[33m.[39mstate[33m.[39mconversationHistory[33m.[39mlength)[33m.[39mtoBe([35m20[39m)[33m;[39m
+     [90m    |[39m                                                     [31m[1m^[22m[39m
+     [90m 70 |[39m         expect(uc[33m.[39mstate[33m.[39mconversationHistory[[35m0[39m][33m.[39mcontent[[35m0[39m][33m.[39mtext)[33m.[39mnot[33m.[39mtoContain([32m'CONTEXT COLLAPSE'[39m)[33m;[39m
+     [90m 71 |[39m     })[33m;[39m
+     [90m 72 |[39m })[33m;[39m[0m
+
+      at Object.toBe (tests/application/use-cases/ContextCollapse.test.js:69:53)
+
+FAIL tests/application/use-cases/ChatUseCase.test.js
+  ● ChatUseCase Memory Injection › deve gravar transcrições em JSONL ao atualizar estado
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: StringContaining "sessions.jsonl", StringContaining "\"user\":\"pergunta\"", "utf-8"
+
+    Number of calls: 0
+
+    [0m [90m 129 |[39m         [36mawait[39m uc[33m.[39mupdateStateFromResponse([32m'pergunta'[39m[33m,[39m [32m'resposta'[39m[33m,[39m [32m'resp_1'[39m[33m,[39m [32m'tok'[39m)[33m;[39m
+     [90m 130 |[39m
+    [31m[1m>[22m[39m[90m 131 |[39m         expect(fs[33m.[39mappendFileSync)[33m.[39mtoHaveBeenCalledWith(
+     [90m     |[39m                                   [31m[1m^[22m[39m
+     [90m 132 |[39m             expect[33m.[39mstringContaining([32m'sessions.jsonl'[39m)[33m,[39m
+     [90m 133 |[39m             expect[33m.[39mstringContaining([32m'"user":"pergunta"'[39m)[33m,[39m
+     [90m 134 |[39m             [32m'utf-8'[39m[0m
+
+      at Object.toHaveBeenCalledWith (tests/application/use-cases/ChatUseCase.test.js:131:35)
+
+  ● ChatUseCase Memory Injection › Memory Hardening › deve remover autodreams antigos além do keepCount
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: "/fake/memory/topic-autodream-20260101.md"
+    Received
+           1: "\\fake\\memory\\topic-autodream-20260101.md"
+           2: "\\fake\\memory\\topic-autodream-20260102.md"
+
+    Number of calls: 2
+
+    [0m [90m 260 |[39m
+     [90m 261 |[39m             expect(fs[33m.[39munlinkSync)[33m.[39mtoHaveBeenCalledTimes([35m2[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 262 |[39m             expect(fs[33m.[39munlinkSync)[33m.[39mtoHaveBeenCalledWith([32m'/fake/memory/topic-autodream-20260101.md'[39m)[33m;[39m
+     [90m     |[39m                                   [31m[1m^[22m[39m
+     [90m 263 |[39m             expect(fs[33m.[39munlinkSync)[33m.[39mtoHaveBeenCalledWith([32m'/fake/memory/topic-autodream-20260102.md'[39m)[33m;[39m
+     [90m 264 |[39m         })[33m;[39m
+     [90m 265 |[39m[0m
+
+      at Object.toHaveBeenCalledWith (tests/application/use-cases/ChatUseCase.test.js:262:35)
+
+PASS tests/interface/CommandRouter.test.js
+PASS tests/domain/constants.test.js
+PASS tests/infrastructure/repositories/JsonTokenRepository.test.js
+PASS tests/chat.test.js
+PASS tests/infrastructure/gateways/AuthGateway.test.js
+
+Test Suites: 2 failed, 8 passed, 10 total
+Tests:       4 failed, 66 passed, 70 total
+Snapshots:   0 total
+Time:        5.019 s
+Ran all test suites.

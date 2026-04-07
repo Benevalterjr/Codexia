@@ -14,6 +14,10 @@ jest.mock('fs', () => ({
     writeFileSync: jest.fn(),
     mkdirSync: jest.fn(),
     appendFileSync: jest.fn(),
+    statSync: jest.fn(),
+    readdirSync: jest.fn(),
+    renameSync: jest.fn(),
+    unlinkSync: jest.fn(),
 }));
 
 describe('ChatUseCase Memory Injection', () => {
@@ -28,6 +32,7 @@ describe('ChatUseCase Memory Injection', () => {
         };
         uc = new ChatUseCase(deps.sessionRepo, deps.tokenRepo, deps.aiGateway, deps.authGateway);
         jest.clearAllMocks();
+        fs.statSync.mockReturnValue({ size: 0 }); // Prevents throwing on default calls
     });
 
     test('deve injetar o conteúdo do MEMORY.md nas instruções quando o arquivo existir', async () => {
@@ -167,5 +172,108 @@ describe('ChatUseCase Memory Injection', () => {
             expect.anything(),
             expect.anything()
         );
+    });
+
+    describe('extractAgenticWrites', () => {
+        test('deve detectar comando /write no formato code block e extrair o conteudo', () => {
+             const payload = '```bash\n/write ../bash-write.md\nconteudo vindo do bloco bash\n```\nTexto extra';
+             const ucInstance = new ChatUseCase({}, {}, {}, {});
+             const writes = ucInstance.extractAgenticWrites(payload);
+             
+             expect(writes).toHaveLength(1);
+             expect(writes[0].targetSpec).toBe('../bash-write.md');
+             expect(writes[0].content).toBe('conteudo vindo do bloco bash');
+        });
+
+        test('deve tratar multiplos writes e remover duplicados pelo path basename', () => {
+             const payload = '```bash\n/write dup.md\n1\n```\n```write dup.md\n2\n```\n```write abc.md\n3\n```';
+             const ucInstance = new ChatUseCase({}, {}, {}, {});
+             const writes = ucInstance.extractAgenticWrites(payload);
+             
+             expect(writes).toHaveLength(2);
+             expect(writes[0].targetSpec).toBe('dup.md');
+             expect(writes[1].targetSpec).toBe('abc.md');
+        });
+    });
+
+    describe('Memory Hardening', () => {
+        test('deve rotacionar sessions.jsonl quando ultrapassar MAX_TRANSCRIPT_BYTES', async () => {
+            // Simular arquivo existente com tamanho acima do limite
+            fs.existsSync.mockReturnValue(true);
+            fs.statSync.mockReturnValue({ size: 600 * 1024 }); // 600KB > 512KB
+            fs.readFileSync.mockReturnValue('# Memory');
+            fs.readdirSync.mockReturnValue([]);
+
+            await uc.updateStateFromResponse('msg', 'resp', 'id1', 'tok');
+
+            expect(fs.renameSync).toHaveBeenCalledWith(
+                expect.stringContaining('sessions.jsonl'),
+                expect.stringContaining('sessions-')
+            );
+        });
+
+        test('NÃO deve rotacionar sessions.jsonl quando abaixo do limite', async () => {
+            fs.existsSync.mockReturnValue(true);
+            fs.statSync.mockReturnValue({ size: 100 * 1024 }); // 100KB < 512KB
+            fs.readFileSync.mockReturnValue('# Memory');
+            fs.readdirSync.mockReturnValue([]);
+
+            await uc.updateStateFromResponse('msg', 'resp', 'id2', 'tok');
+
+            expect(fs.renameSync).not.toHaveBeenCalled();
+        });
+
+        test('deve disparar collapse quando totalChars exceder MAX_CONTEXT_CHARS', async () => {
+            fs.existsSync.mockReturnValue(true);
+            fs.statSync.mockReturnValue({ size: 100 });
+            fs.readFileSync.mockReturnValue('# Memory');
+            fs.readdirSync.mockReturnValue([]);
+
+            // Forçar modelo codex
+            uc.state.currentModel = 'gpt-5.3-codex';
+            
+            // Simular histórico enorme (acima de 60K chars)
+            const bigText = 'x'.repeat(35000);
+            uc.state.conversationHistory = [
+                { role: 'user', content: [{ type: 'input_text', text: bigText }] },
+                { role: 'assistant', content: [{ type: 'output_text', text: bigText }] },
+            ];
+
+            // Mock do summarize para o collapse
+            deps.aiGateway.summarize = jest.fn().mockResolvedValue('resumo comprimido');
+
+            await uc.updateStateFromResponse('nova msg', 'nova resp', 'id3', 'tok');
+
+            // O collapse deve ter sido chamado (summarize invocado)
+            expect(deps.aiGateway.summarize).toHaveBeenCalled();
+        });
+
+        test('deve remover autodreams antigos além do keepCount', () => {
+            fs.readdirSync.mockReturnValue([
+                'topic-autodream-20260101.md',
+                'topic-autodream-20260102.md',
+                'topic-autodream-20260103.md',
+                'topic-autodream-20260104.md',
+            ]);
+
+            // keepCount = 2, deve deletar os 2 mais antigos
+            uc._pruneOldAutoDreams('/fake/memory', 2);
+
+            expect(fs.unlinkSync).toHaveBeenCalledTimes(2);
+            const path = require('path');
+            expect(fs.unlinkSync).toHaveBeenCalledWith(path.join('/fake/memory', 'topic-autodream-20260101.md'));
+            expect(fs.unlinkSync).toHaveBeenCalledWith(path.join('/fake/memory', 'topic-autodream-20260102.md'));
+        });
+
+        test('NÃO deve deletar quando quantidade está dentro do keepCount', () => {
+            fs.readdirSync.mockReturnValue([
+                'topic-autodream-20260101.md',
+                'topic-autodream-20260102.md',
+            ]);
+
+            uc._pruneOldAutoDreams('/fake/memory', 5);
+
+            expect(fs.unlinkSync).not.toHaveBeenCalled();
+        });
     });
 });

@@ -23,11 +23,11 @@ describe('ChatUseCase Context Collapse', () => {
         jest.clearAllMocks();
     });
 
-    test('deve disparar _collapseHistory quando o histórico exceder 40 mensagens', async () => {
+    test('deve disparar _collapseHistory quando o histórico exceder MAX_CONTEXT_CHARS', async () => {
         // Popular histórico com 40 mensagens (20 pares user/assistant)
         for (let i = 0; i < 20; i++) {
-            uc.state.conversationHistory.push({ role: 'user', content: [{ text: `msg ${i}` }] });
-            uc.state.conversationHistory.push({ role: 'assistant', content: [{ text: `resp ${i}` }] });
+            uc.state.conversationHistory.push({ role: 'user', content: [{ text: 'u'.repeat(2000) }] });
+            uc.state.conversationHistory.push({ role: 'assistant', content: [{ text: 'a'.repeat(2000) }] });
         }
 
         expect(uc.state.conversationHistory.length).toBe(40);
@@ -54,8 +54,8 @@ describe('ChatUseCase Context Collapse', () => {
 
     test('deve usar fallback (slice) se o summarize falhar', async () => {
         for (let i = 0; i < 20; i++) {
-            uc.state.conversationHistory.push({ role: 'user', content: [{ text: `i` }] });
-            uc.state.conversationHistory.push({ role: 'assistant', content: [{ text: `i` }] });
+            uc.state.conversationHistory.push({ role: 'user', content: [{ text: 'u'.repeat(2000) }] });
+            uc.state.conversationHistory.push({ role: 'assistant', content: [{ text: 'a'.repeat(2000) }] });
         }
 
         // Simular falha na API de resumo

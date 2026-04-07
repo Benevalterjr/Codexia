@@ -110,8 +110,10 @@ class ChatUseCase {
                 content: [{ type: "output_text", text: aiText }]
             });
             
-            // Context Collapse (Comprimir se houver > 40 mensagens)
-            if (this.state.conversationHistory.length > 40) {
+            // Context Collapse — baseado em estimativa de tokens, não contagem
+            const totalChars = this.state.conversationHistory
+                .reduce((sum, msg) => sum + (msg.content?.[0]?.text?.length || 0), 0);
+            if (totalChars > CONFIG.MAX_CONTEXT_CHARS) {
                 await this._collapseHistory(accessToken);
             }
         }
@@ -126,6 +128,16 @@ class ChatUseCase {
             const transcriptsDir = path.join(rootDir, 'memory', 'transcripts');
             const transcriptPath = path.join(transcriptsDir, 'sessions.jsonl');
             if (!fs.existsSync(transcriptsDir)) fs.mkdirSync(transcriptsDir, { recursive: true });
+
+            // Rotação: arquivar se ultrapassar o limite
+            if (fs.existsSync(transcriptPath)) {
+                const stats = fs.statSync(transcriptPath);
+                if (stats.size > CONFIG.MAX_TRANSCRIPT_BYTES) {
+                    const archiveName = `sessions-${Date.now()}.jsonl`;
+                    fs.renameSync(transcriptPath, path.join(transcriptsDir, archiveName));
+                }
+            }
+
             const entry = {
                 at: new Date().toISOString(),
                 model: this.state.currentModel,
@@ -172,6 +184,9 @@ class ChatUseCase {
             const topicPath = path.join(memoryDir, `topic-autodream-${dateTag}.md`);
             fs.writeFileSync(topicPath, DEFAULT_AUTODREAM_TOPIC(new Date().toISOString().slice(0, 10), highlights), 'utf-8');
 
+            // Garbage Collection: manter apenas os últimos N autodreams
+            this._pruneOldAutoDreams(memoryDir, CONFIG.AUTODREAM_KEEP_COUNT);
+
             const entryLine = `- [AUTO:DREAM] Consolidação assíncrona — memory/topic-autodream-${dateTag}.md`;
             const indexText = fs.existsSync(memoryPath) ? fs.readFileSync(memoryPath, 'utf-8') : DEFAULT_MEMORY_TEMPLATE;
             if (!indexText.includes(entryLine)) {
@@ -181,6 +196,50 @@ class ChatUseCase {
                 fs.writeFileSync(memoryPath, updated, 'utf-8');
             }
         } catch (_) { /* Ignore */ }
+    }
+
+    _pruneOldAutoDreams(memoryDir, keepCount = 7) {
+        try {
+            const files = fs.readdirSync(memoryDir)
+                .filter(f => f.startsWith('topic-autodream-'))
+                .sort();
+            if (files.length <= keepCount) return;
+            const toDelete = files.slice(0, files.length - keepCount);
+            for (const file of toDelete) {
+                fs.unlinkSync(path.join(memoryDir, file));
+            }
+        } catch (_) { /* Ignore */ }
+    }
+
+    extractAgenticWrites(text) {
+        const writes = [];
+        const seen = new Set();
+
+        // Pass 1: ```bash/sh blocks with /write command
+        const commandBlockRegex = /```(?:bash|sh)?\s*\n\/write\s+([^\n]+)\n([\s\S]*?)\n```/g;
+        let match;
+        let cleaned = text;
+        while ((match = commandBlockRegex.exec(text)) !== null) {
+            const key = match[1].trim().split(/\s+/)[0];
+            if (!seen.has(key)) {
+                writes.push({ targetSpec: match[1], content: match[2] });
+                seen.add(key);
+            }
+            // Remove matched block to prevent duplicate capture in pass 2
+            cleaned = cleaned.replace(match[0], '');
+        }
+
+        // Pass 2: ```write blocks (only on cleaned text)
+        const fencedRegex = /```write\s+([^\n]+)\n([\s\S]*?)\n```/g;
+        while ((match = fencedRegex.exec(cleaned)) !== null) {
+            const key = match[1].trim().split(/\s+/)[0];
+            if (!seen.has(key)) {
+                writes.push({ targetSpec: match[1], content: match[2] });
+                seen.add(key);
+            }
+        }
+
+        return writes;
     }
 
     async _collapseHistory(accessToken) {

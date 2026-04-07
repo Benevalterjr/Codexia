@@ -33,9 +33,8 @@ describe('CommandRouter', () => {
                 fetchPageContent: jest.fn(),
                 close: jest.fn() 
             },
-            streamResponse: jest.fn(),
+            aiGateway: { streamResponse: jest.fn() },
             getOrAuthToken: jest.fn(),
-            handleDeviceAuth: jest.fn(),
             printHelp: jest.fn(),
             printTokenInfo: jest.fn()
         };
@@ -114,7 +113,7 @@ describe('CommandRouter', () => {
     test('/reauth deve resetar sessão e disparar auth', async () => {
         await handleCommand('/reauth', [], mockRl, appState, deps);
         expect(deps.tokenRepo.delete).toHaveBeenCalled();
-        expect(deps.handleDeviceAuth).toHaveBeenCalled();
         expect(deps.chatUseCase.resetSession).toHaveBeenCalled();
+        expect(deps.getOrAuthToken).toHaveBeenCalledWith(true);
     });
 });

@@ -34,8 +34,8 @@ function buildWritePreview(currentContent, nextContent, filePath) {
 async function handleCommand(cmd, args, rl, appState, deps) {
     const { 
         C, CONFIG, chatUseCase, automationUseCase, tokenRepo, 
-        authGateway, browserGateway, streamResponse, 
-        getOrAuthToken, handleDeviceAuth, printHelp, printTokenInfo,
+        authGateway, browserGateway, aiGateway,
+        getOrAuthToken, printHelp, printTokenInfo,
         confirmWrite
     } = deps;
 
@@ -88,7 +88,7 @@ async function handleCommand(cmd, args, rl, appState, deps) {
                     console.log(`${C.dim}Modelo: ${result.targetModel} | Injeção: ${inject ? "SIM" : "NÃO"}${C.reset}\n`);
                     
                     if (result.stream) {
-                        const resp = await streamResponse(result.stream);
+                        const resp = await aiGateway.streamResponse(result.stream);
                         if (inject) {
                             chatUseCase.updateStateFromResponse(`[AUTOMATION:${file}]`, resp.text, resp.responseId);
                         }
@@ -245,8 +245,8 @@ async function handleCommand(cmd, args, rl, appState, deps) {
         case '/reauth':
             console.log(`${C.yellow}🔑 A reiniciar autenticação...${C.reset}`);
             tokenRepo.delete();
-            await handleDeviceAuth(); 
             chatUseCase.resetSession();
+            await getOrAuthToken(true);
             break;
         default:
             console.log(`${C.red}✗ Comando desconhecido: ${cmd}${C.reset}\n`);

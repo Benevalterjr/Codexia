@@ -20,6 +20,10 @@ yarn-error.log*
 memory/
 MEMORY.md
 
+# Patches e diffs temporários
+*.patch
+*.diff
+
 # OS específicos
 .DS_Store
 Thumbs.db

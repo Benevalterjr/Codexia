@@ -43,6 +43,12 @@ const CONFIG = {
     SESSION_FILE: path.join(__dirname, '../../codex_session.json'),
     VALID_MODELS: resolveValidModels(),
     AUTOMATIONS_DIR: path.join(__dirname, '../../automations'),
+
+    // Memory Hardening Limits
+    MAX_TRANSCRIPT_BYTES: 512 * 1024,       // 512KB antes de rotacionar sessions.jsonl
+    MAX_CONTEXT_CHARS: 60_000,              // ~15K tokens, gatilho do context collapse
+    MAX_MEMORY_INJECT_CHARS: 2_000,         // Limite de chars do MEMORY.md injetado no prompt
+    AUTODREAM_KEEP_COUNT: 7,                // Manter apenas os últimos 7 autodreams
 };
 
 module.exports = { C, CONFIG };
