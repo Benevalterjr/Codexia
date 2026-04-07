@@ -17,12 +17,13 @@ describe('CommandRouter /write', () => {
             CONFIG: { DEFAULT_MODEL: 'gpt-4o', VALID_MODELS: ['gpt-4o'] },
             chatUseCase: { setModel: jest.fn(), state: { currentModel: 'gpt-4o' } },
             content: "Conteúdo de teste",
+            confirmWrite: jest.fn().mockResolvedValue(true),
             handleDeviceAuth: jest.fn(),
             tokenRepo: { delete: jest.fn() },
             printHelp: jest.fn(),
             printTokenInfo: jest.fn()
         };
-        mockRl = { prompt: jest.fn() };
+        mockRl = { prompt: jest.fn(), question: jest.fn((_, cb) => cb('y')) };
         appState = { isMultiline: false, multilineBuffer: [] };
         
         logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -32,6 +33,7 @@ describe('CommandRouter /write', () => {
         jest.spyOn(fs, 'existsSync').mockImplementation(() => false);
         jest.spyOn(fs, 'mkdirSync').mockImplementation(() => {});
         jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+        jest.spyOn(fs, 'readFileSync').mockImplementation(() => 'conteudo antigo');
         jest.spyOn(fs, 'lstatSync').mockImplementation(() => ({ isDirectory: () => false }));
         
         // Spy on Path methods
@@ -48,6 +50,8 @@ describe('CommandRouter /write', () => {
         
         await handleCommand('/write', ['test.md'], mockRl, appState, deps);
 
+        expect(deps.confirmWrite).toHaveBeenCalled();
+        expect(deps.confirmWrite.mock.calls[0][0].diffPreview).toContain('@@ preview @@');
         expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringContaining('test.md'), "Conteúdo de teste", 'utf-8');
         expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Arquivo escrito com sucesso'));
     });
@@ -75,5 +79,26 @@ describe('CommandRouter /write', () => {
 
         expect(fs.writeFileSync).toHaveBeenCalled();
         expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[AUDIT] Escrita externa autorizada'));
+    });
+
+    test('deve cancelar escrita quando usuário não confirma', async () => {
+        deps.confirmWrite.mockResolvedValue(false);
+        fs.existsSync.mockReturnValue(true);
+
+        await handleCommand('/write', ['test.md'], mockRl, appState, deps);
+
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Escrita cancelada pelo usuário'));
+    });
+
+    test('deve usar fallback interativo quando confirmWrite não for fornecido', async () => {
+        delete deps.confirmWrite;
+        mockRl.question.mockImplementation((_, cb) => cb('y'));
+        fs.existsSync.mockReturnValue(true);
+
+        await handleCommand('/write', ['test.md'], mockRl, appState, deps);
+
+        expect(mockRl.question).toHaveBeenCalled();
+        expect(fs.writeFileSync).toHaveBeenCalled();
     });
 });
