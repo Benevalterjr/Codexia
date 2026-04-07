@@ -16,9 +16,10 @@ O **Codexia** evoluiu de um simples cliente de chat para um **Motor de Engenhari
 
 ## ✨ Funcionalidades Avançadas
 
-- 🧠 **Memória Agêntica Autônoma**: A IA atua como Curadora de Memória, criando tópicos técnicos (`memory/`) e atualizando o índice (`MEMORY.md`) com autorização humana.
+- 🧠 **Memória Agêntica Autônoma**: A IA atua como Curadora de Memória, criando tópicos técnicos (`memory/`) e atualizando o índice (`MEMORY.md`) com autorização humana. Toda essa pasta é protegida de versionamento (privada ao usuário).
+- 💤 **AutoDream (Consolidação Assíncrona)**: O motor grava silenciosamente telemetria de sessão em `sessions.jsonl` e auto-sintetiza contextos em tópicos `[AUTO:DREAM]`, aliviando o uso de tokens.
 - 🛡️ **Hardening de Segurança**: Tokens criptografados com **AES-256-GCM** e sandbox de arquivos que impede acesso fora do workspace por padrão.
-- 🧊 **Context Collapse**: Sistema de compressão inteligente que sumariza o histórico ao atingir 40 mensagens, mantendo a precisão sem estourar o limite de tokens.
+- 🧊 **Context Collapse**: Sistema de compressão inteligente que sumariza o histórico de curto prazo ao atingir 40 mensagens.
 - 📂 **Introspecção de Workspace**: Comandos integrados para ler arquivos (`/read`), buscar documentações web (`/fetch`) e persistir mudanças (`/write`).
 - ⚡ **Real-time Streaming**: Respostas geradas token por token com suporte a modo multiline (`/paste`).
 
@@ -46,6 +47,7 @@ O **Codexia** evoluiu de um simples cliente de chat para um **Motor de Engenhari
 
 ## 💡 Comandos Essenciais
 
+- `/new` — Reseta estado do servidor local (clear context).
 - `/read <path>` — Lê arquivos ou pastas com validação de sandbox.
 - `/fetch <url>` — Extrai conteúdo textual de páginas web usando Playwright.
 - `/write <path>` — Escrita de arquivos sugerida pelo agente (Human-in-the-Loop).

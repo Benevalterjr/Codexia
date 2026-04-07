@@ -60,13 +60,17 @@ A dedicated **Memory Curator** system maintains long-term project knowledge:
 
 ### 4.1 Multi-Layer Context
 - **Session Memory**: Active conversation history (Short-term).
-- **Memory topics** (`memory/`): Curated technical topic files in Markdown (Long-term).
+- **Session Telemetry** (`memory/transcripts/sessions.jsonl`): System-level raw logs of all interactions.
+- **Memory topics** (`memory/`): Curated technical topic files in Markdown (Long-term). Entirely auto-generated on first use and untracked by Git to preserve user privacy.
 - **Memory Index** (`MEMORY.md`): Central entry point for all project-specific knowledge.
 
 ### 4.2 Autonomous Ops
 The AI can autonomously propose new memories or index updates via the `/write` command. 
 > [!IMPORTANT]
 > **Human-in-the-Loop**: All autonomous write operations require explicit human authorization (y/N) via a reactive terminal prompt.
+
+### 4.3 AutoDream (Asynchronous Consolidation)
+To alleviate the developer from manually initiating context curation, Codexia implements an asynchronous process that runs seamlessly post-user-interaction. It reads the raw JSONL telemetries and spins off an `[AUTO:DREAM]` topic summarizing recent decisions directly into `MEMORY.md`.
 
 ## 5. Context Collapse (Auto-Compression)
 
