@@ -6,8 +6,6 @@
  */
 
 const readline = require('readline');
-const fs = require('fs');
-const path = require('path');
 
 // Dominio e Infra
 const { C, CONFIG } = require('./src/domain/constants');
@@ -147,19 +145,30 @@ function createApp(deps) {
 
     function extractAgenticWrites(text) {
         const writes = [];
-        const commandBlockRegex = /```(?:bash|sh)?\s*\n\/write\s+([^\n]+)\n([\s\S]*?)\n```/g;
-        const fencedRegex = /```write\s+([^\n]+)\n([\s\S]*?)\n```/g;
-        const inlineRegex = /(?:^|\n)\/write\s+([^\n]+)\n([\s\S]*?)(?=\n\/write\s+[^\n]+\n|$)/g;
+        const seen = new Set();
 
+        // Pass 1: ```bash/sh blocks with /write command
+        const commandBlockRegex = /```(?:bash|sh)?\s*\n\/write\s+([^\n]+)\n([\s\S]*?)\n```/g;
         let match;
+        let cleaned = text;
         while ((match = commandBlockRegex.exec(text)) !== null) {
-            writes.push({ targetSpec: match[1], content: match[2] });
+            const key = match[1].trim().split(/\s+/)[0];
+            if (!seen.has(key)) {
+                writes.push({ targetSpec: match[1], content: match[2] });
+                seen.add(key);
+            }
+            // Remove matched block to prevent duplicate capture in pass 2
+            cleaned = cleaned.replace(match[0], '');
         }
-        while ((match = fencedRegex.exec(text)) !== null) {
-            writes.push({ targetSpec: match[1], content: match[2] });
-        }
-        while ((match = inlineRegex.exec(text)) !== null) {
-            writes.push({ targetSpec: match[1], content: match[2] });
+
+        // Pass 2: ```write blocks (only on cleaned text)
+        const fencedRegex = /```write\s+([^\n]+)\n([\s\S]*?)\n```/g;
+        while ((match = fencedRegex.exec(cleaned)) !== null) {
+            const key = match[1].trim().split(/\s+/)[0];
+            if (!seen.has(key)) {
+                writes.push({ targetSpec: match[1], content: match[2] });
+                seen.add(key);
+            }
         }
 
         return writes;
@@ -196,7 +205,7 @@ ${C.bold}Estado dos Tokens:${C.reset}
             const parsedInterval = typeof ucData.interval === 'string'
                 ? Number.parseInt(ucData.interval, 10)
                 : Number(ucData.interval);
-            const interval = Number.isFinite(parsedInterval) && parsedInterval >= 0 ? parsedInterval : 5;
+            const interval = Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : 5;
             
             console.log(`╭──────────────────────────────────────────────╮`);
             console.log(`│  ${C.bold}1.${C.reset} Abra: ${C.cyan}https://auth.openai.com/codex/device${C.reset}  │`);
