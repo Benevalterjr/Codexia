@@ -48,6 +48,7 @@ Persistência de arquivos via Agente ou Manual.
 - **O que faz**: Grava conteúdo em disco.
 - **Uso Agêntico**: A IA pode propor este comando para criar memórias (`memory/`) ou atualizar o índice (`MEMORY.md`).
 - **Segurança**: Exibe preview de diff, requer autorização explícita (y/N) no terminal e validação de sandbox.
+- **Bootstrap de memória**: Se `MEMORY.md` não existir, o Codexia cria automaticamente um template padrão de índice na primeira interação de chat.
 
 ---
 

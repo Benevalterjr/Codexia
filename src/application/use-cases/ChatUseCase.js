@@ -3,6 +3,17 @@ const fs = require('fs');
 const path = require('path');
 const { buildDefaultInstructions, buildCodexInstructions } = require('../PromptBuilder');
 
+const DEFAULT_MEMORY_TEMPLATE = `# MEMORY Index
+
+Use este arquivo como índice de conhecimento persistente do projeto.
+
+## Convenção de entradas
+- [TAG:ID] Descrição curta — memory/topic-nome-data.md
+
+## Tópicos
+- [INIT:0001] Bootstrap do índice de memória — memory/topic-bootstrap-0001.md
+`;
+
 class ChatUseCase {
     constructor(sessionRepo, tokenRepo, aiGateway, authGateway) {
         this.sessionRepo = sessionRepo;
@@ -111,6 +122,9 @@ class ChatUseCase {
         let memoryIndex = '';
         try {
             const memoryPath = path.join(__dirname, '../../../MEMORY.md');
+            if (!fs.existsSync(memoryPath)) {
+                fs.writeFileSync(memoryPath, DEFAULT_MEMORY_TEMPLATE, 'utf-8');
+            }
             if (fs.existsSync(memoryPath)) {
                 memoryIndex = fs.readFileSync(memoryPath, 'utf-8');
                 if (process.env.DEBUG === 'true') {
