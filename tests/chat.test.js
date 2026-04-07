@@ -243,6 +243,17 @@ describe('streamResponse — SSE Parser', () => {
         const result = await streamResponse(stream, output);
         expect(result.text).toBe('split');
     });
+
+    test('deve parsear linhas SSE no formato data: sem espaço', async () => {
+        const output = createMockOutput();
+        const stream = createMockStream([
+            'data:{"type":"response.output_text.delta","delta":"ok"}\n',
+            'data:[DONE]\n',
+        ]);
+
+        const result = await streamResponse(stream, output);
+        expect(result.text).toBe('ok');
+    });
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -290,7 +301,7 @@ describe('createApp', () => {
             deps.authGateway.requestUserCode.mockResolvedValue({
                 user_code: 'ABC-123',
                 device_auth_id: 'dev_1',
-                interval: 0,
+                interval: 1,
             });
             deps.authGateway.pollForToken.mockResolvedValue({
                 authorization_code: 'auth_code',
@@ -318,7 +329,7 @@ describe('createApp', () => {
             deps.authGateway.requestUserCode.mockResolvedValue({
                 user_code: 'TEST-CODE',
                 device_auth_id: 'dev_123',
-                interval: 0,
+                interval: 1,
             });
             deps.authGateway.pollForToken.mockResolvedValue({
                 authorization_code: 'auth_xyz',
@@ -352,7 +363,7 @@ describe('createApp', () => {
             deps.authGateway.requestUserCode.mockResolvedValue({
                 usercode: 'ALT-CODE',
                 device_auth_id: 'dev_alt',
-                interval: '0', // String interval — testa parseInt
+                interval: '1', // String interval — testa parseInt
             });
             deps.authGateway.pollForToken.mockResolvedValue({
                 authorization_code: 'auth_alt',
@@ -376,7 +387,7 @@ describe('createApp', () => {
             deps.authGateway.requestUserCode.mockResolvedValue({
                 user_code: 'TEST-CODE',
                 device_auth_id: 'dev_123',
-                interval: 0,
+                interval: 1,
             });
             
             // Simular erro 401 no primeiro poll
@@ -639,6 +650,73 @@ describe('createApp', () => {
             expect(hasPreviewLog).toBe(true);
         });
 
+        test('deve ignorar /write inline para evitar falso positivo', async () => {
+            deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
+            const agenticInline = '/write ../inline.md\nLinha 1\nLinha 2';
+            const mockStream = createMockStream([
+                `data: {"type":"response.output_text.delta","delta":${JSON.stringify(agenticInline)}}\n`,
+                'data: [DONE]\n',
+            ]);
+            deps.chatUseCase.sendMessage.mockResolvedValue({ stream: mockStream });
+            mockRl.question = jest.fn((q, cb) => cb('y'));
+
+            await app.processInput('salve inline', mockRl);
+
+            const logCalls = logSpy.mock.calls.map(call => call[0]);
+            const hasAgentLog = logCalls.some(log => log.includes('AGENTE:') && log.includes('../inline.md'));
+            expect(hasAgentLog).toBe(false);
+        });
+
+        test('deve detectar comando /write dentro de bloco ```bash```', async () => {
+            deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
+            const payload = '```bash\n/write ../bash-write.md\nconteudo vindo do bloco bash\n```';
+            const mockStream = createMockStream([
+                `data: {"type":"response.output_text.delta","delta":${JSON.stringify(payload)}}\n`,
+                'data: [DONE]\n',
+            ]);
+            deps.chatUseCase.sendMessage.mockResolvedValue({ stream: mockStream });
+            mockRl.question = jest.fn((q, cb) => cb('y'));
+
+            await app.processInput('teste bash write', mockRl);
+
+            const logCalls = logSpy.mock.calls.map(call => call[0]);
+            const hasAgentLog = logCalls.some(log => log.includes('AGENTE:') && log.includes('../bash-write.md'));
+            expect(hasAgentLog).toBe(true);
+        });
+
+        test('deve ignorar path inválido de /write sugerido pelo agente', async () => {
+            deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
+            const payload = '```write <path>\nconteudo invalido\n```';
+            const mockStream = createMockStream([
+                `data: {"type":"response.output_text.delta","delta":${JSON.stringify(payload)}}\n`,
+                'data: [DONE]\n',
+            ]);
+            deps.chatUseCase.sendMessage.mockResolvedValue({ stream: mockStream });
+            mockRl.question = jest.fn((q, cb) => cb('y'));
+
+            await app.processInput('teste path invalido', mockRl);
+
+            const output = logSpy.mock.calls.map(c => c[0]).join('\n');
+            expect(output).toContain('path inválido ignorado');
+        });
+
+        test('não deve inferir --force a partir do conteúdo do bloco agentic', async () => {
+            deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
+            const payload = '```write ../fora.txt\nconteudo normal com token textual --force dentro\n```';
+            const mockStream = createMockStream([
+                `data: {"type":"response.output_text.delta","delta":${JSON.stringify(payload)}}\n`,
+                'data: [DONE]\n',
+            ]);
+            deps.chatUseCase.sendMessage.mockResolvedValue({ stream: mockStream });
+            mockRl.question = jest.fn((q, cb) => cb('y'));
+
+            await app.processInput('teste force', mockRl);
+
+            const output = logSpy.mock.calls.map(c => c[0]).join('\n');
+            expect(output).toContain('Tentativa de escrita fora do workspace');
+            expect(output).not.toContain('Escrita externa autorizada via --force');
+        });
+
         test('deve ignorar entradas paralelas (backpressure) no loop principal', async () => {
             const rlOn = jest.fn();
             const rlPrompt = jest.fn();
@@ -696,6 +774,28 @@ describe('createApp', () => {
             // O sendMessage NÃO deve ter sido chamado para a segunda mensagem
             expect(deps.chatUseCase.sendMessage).toHaveBeenCalledTimes(1);
             
+            createInterfaceSpy.mockRestore();
+        });
+
+        test('start não deve quebrar quando tokenRepo.load retorna null', async () => {
+            const rlOn = jest.fn();
+            const rlPrompt = jest.fn();
+            const mockRl = {
+                on: rlOn,
+                prompt: rlPrompt,
+                close: jest.fn(),
+                pause: jest.fn(),
+                resume: jest.fn()
+            };
+            const createInterfaceSpy = jest.spyOn(readline, 'createInterface').mockReturnValue(mockRl);
+
+            deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
+            deps.tokenRepo.load.mockReturnValue(null);
+
+            await app.start();
+
+            const output = logSpy.mock.calls.map(c => c[0]).join('\n');
+            expect(output).toContain('metadados de expiração indisponíveis');
             createInterfaceSpy.mockRestore();
         });
     });

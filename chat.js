@@ -6,8 +6,6 @@
  */
 
 const readline = require('readline');
-const fs = require('fs');
-const path = require('path');
 
 // Dominio e Infra
 const { C, CONFIG } = require('./src/domain/constants');
@@ -81,8 +79,8 @@ async function streamResponse(stream, output = process.stdout) {
             buffer = lines.pop() || '';
             
             for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const data = line.slice(6).trim();
+                if (/^data:\s?/.test(line)) {
+                    const data = line.replace(/^data:\s?/, '').trim();
                     if (data === '[DONE]') continue;
                     
                     try {
@@ -145,6 +143,22 @@ function createApp(deps) {
         multilineBuffer: [],
     };
 
+    function extractAgenticWrites(text) {
+        const writes = [];
+        const commandBlockRegex = /```(?:bash|sh)?\s*\n\/write\s+([^\n]+)\n([\s\S]*?)\n```/g;
+        const fencedRegex = /```write\s+([^\n]+)\n([\s\S]*?)\n```/g;
+
+        let match;
+        while ((match = commandBlockRegex.exec(text)) !== null) {
+            writes.push({ targetSpec: match[1], content: match[2] });
+        }
+        while ((match = fencedRegex.exec(text)) !== null) {
+            writes.push({ targetSpec: match[1], content: match[2] });
+        }
+
+        return writes;
+    }
+
     function printTokenInfo() {
         const tokens = tokenRepo.load();
         if (!tokens) {
@@ -173,7 +187,10 @@ ${C.bold}Estado dos Tokens:${C.reset}
         try {
             const ucData = await authGateway.requestUserCode();
             const userCode = ucData.user_code || ucData.usercode;
-            const interval = typeof ucData.interval === 'string' ? parseInt(ucData.interval, 10) : (ucData.interval ?? 5);
+            const parsedInterval = typeof ucData.interval === 'string'
+                ? Number.parseInt(ucData.interval, 10)
+                : Number(ucData.interval);
+            const interval = Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : 5;
             
             console.log(`╭──────────────────────────────────────────────╮`);
             console.log(`│  ${C.bold}1.${C.reset} Abra: ${C.cyan}https://auth.openai.com/codex/device${C.reset}  │`);
@@ -271,19 +288,25 @@ ${C.bold}Estado dos Tokens:${C.reset}
 
             // AGENTIC: Detetar se a IA quer escrever arquivos (Memória Autônoma)
             // Utiliza blocos delimitados: ```write <path>\n<conteúdo>\n```
-            const writeRegex = /```write\s+([a-zA-Z0-9\/\._\-\\]+)\n([\s\S]*?)\n```/g;
-            let match;
-            
-            while ((match = writeRegex.exec(resp.text)) !== null) {
-                let targetPath = match[1];
-                let content = match[2]; // Capturado puramente até o fechamento do bloco
+            const pendingWrites = extractAgenticWrites(resp.text);
+            for (const pendingWrite of pendingWrites) {
+                let targetSpec = pendingWrite.targetSpec.trim();
+                let content = pendingWrite.content; // Capturado puramente até o fechamento do bloco
                 
                 // Limpeza extrema: remover pontuação final acidental do path
-                targetPath = targetPath.replace(/[\.\)\,\?\!]+$/, '');
+                targetSpec = targetSpec.replace(/[\.\)\,\?\!]+$/, '');
+                const pathTokens = targetSpec.split(/\s+/).filter(Boolean);
+                const targetPath = pathTokens[0];
+                const pathHasForceFlag = pathTokens.includes('--force');
+
+                if (!targetPath || /[<>`]/.test(targetPath)) {
+                    console.log(`${C.yellow}⚠ AGENTE: path inválido ignorado (${targetPath || 'vazio'}).${C.reset}`);
+                    continue;
+                }
                 
                 // Remover flags se existirem (ex: --force)
-                const isForce = content.includes('--force');
-                content = content.replace('--force', '').trim();
+                const isForce = pathHasForceFlag;
+                content = content.trim();
 
                 console.log(`\n${C.magenta}${C.bold}🤖 AGENTE:${C.reset} A IA deseja escrever em: ${C.bold}${targetPath}${C.reset}`);
                 console.log(`${C.dim}Preview (${content.length} chars): ${content.substring(0, 80).replace(/\n/g, ' ')}...${C.reset}`);
@@ -292,7 +315,8 @@ ${C.bold}Estado dos Tokens:${C.reset}
                 if (confirm.toLowerCase() === 'y') {
                     await handleCommand('/write', [targetPath, isForce ? '--force' : ''].filter(Boolean), rl, appState, {
                         ...ctx,
-                        content
+                        content,
+                        confirmWrite: async () => true
                     });
                 } else {
                     console.log(`${C.red}✗ Escrita recusada.${C.reset}\n`);
@@ -313,8 +337,12 @@ ${C.bold}Estado dos Tokens:${C.reset}
         if (!accessToken) process.exit(1);
 
         const tokens = tokenRepo.load();
-        const expDate = new Date(tokens.expires_at).toLocaleString('pt-BR');
-        console.log(`${C.green}✓ Token válido ${C.dim}(expira: ${expDate})${C.reset}`);
+        if (tokens?.expires_at) {
+            const expDate = new Date(tokens.expires_at).toLocaleString('pt-BR');
+            console.log(`${C.green}✓ Token válido ${C.dim}(expira: ${expDate})${C.reset}`);
+        } else {
+            console.log(`${C.yellow}⚠ Token obtido, mas metadados de expiração indisponíveis.${C.reset}`);
+        }
         
         const rl = readline.createInterface({
             input: process.stdin,

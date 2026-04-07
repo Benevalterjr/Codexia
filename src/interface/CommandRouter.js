@@ -1,11 +1,42 @@
 const fs = require('fs');
 const path = require('path');
 
+function askForWriteConfirmation(rl) {
+    return new Promise(resolve => {
+        if (!rl || typeof rl.question !== 'function') {
+            return resolve(false);
+        }
+        rl.question('Confirmar escrita do arquivo? (y/N): ', answer => {
+            const normalized = (answer || '').trim().toLowerCase();
+            resolve(normalized === 'y' || normalized === 'yes' || normalized === 's' || normalized === 'sim');
+        });
+    });
+}
+
+function buildWritePreview(currentContent, nextContent, filePath) {
+    const before = (currentContent || '').split('\n');
+    const after = (nextContent || '').split('\n');
+
+    const removed = before.filter(line => !after.includes(line)).slice(0, 20);
+    const added = after.filter(line => !before.includes(line)).slice(0, 20);
+
+    const preview = [
+        `--- ${filePath} (current)`,
+        `+++ ${filePath} (next)`,
+        '@@ preview @@',
+        ...removed.map(line => `- ${line}`),
+        ...added.map(line => `+ ${line}`),
+    ].join('\n');
+
+    return preview;
+}
+
 async function handleCommand(cmd, args, rl, appState, deps) {
     const { 
         C, CONFIG, chatUseCase, automationUseCase, tokenRepo, 
         authGateway, browserGateway, streamResponse, 
-        getOrAuthToken, handleDeviceAuth, printHelp, printTokenInfo
+        getOrAuthToken, handleDeviceAuth, printHelp, printTokenInfo,
+        confirmWrite
     } = deps;
 
     switch (cmd.toLowerCase()) {
@@ -185,6 +216,20 @@ async function handleCommand(cmd, args, rl, appState, deps) {
 
                 const content = deps.content || "";
                 try {
+                    const currentContent = fs.existsSync(absPath)
+                        ? fs.readFileSync(absPath, 'utf-8')
+                        : '';
+                    const diffPreview = buildWritePreview(currentContent, content, absPath);
+                    console.log(`${C.dim}${diffPreview}${C.reset}`);
+
+                    const confirmed = typeof confirmWrite === 'function'
+                        ? await confirmWrite({ path: absPath, content, diffPreview })
+                        : await askForWriteConfirmation(rl);
+                    if (!confirmed) {
+                        console.log(`${C.yellow}⚠ Escrita cancelada pelo usuário.${C.reset}\n`);
+                        break;
+                    }
+
                     const dir = path.dirname(absPath);
                     if (!fs.existsSync(dir)) {
                         fs.mkdirSync(dir, { recursive: true });

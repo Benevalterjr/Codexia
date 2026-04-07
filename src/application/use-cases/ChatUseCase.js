@@ -1,6 +1,18 @@
 const { CONFIG } = require('../../domain/constants');
 const fs = require('fs');
 const path = require('path');
+const { buildDefaultInstructions, buildCodexInstructions } = require('../PromptBuilder');
+
+const DEFAULT_MEMORY_TEMPLATE = `# MEMORY Index
+
+Use este arquivo como índice de conhecimento persistente do projeto.
+
+## Convenção de entradas
+- [TAG:ID] Descrição curta — memory/topic-nome-data.md
+
+## Tópicos
+- [INIT:0001] Bootstrap do índice de memória — memory/topic-bootstrap-0001.md
+`;
 
 class ChatUseCase {
     constructor(sessionRepo, tokenRepo, aiGateway, authGateway) {
@@ -110,6 +122,9 @@ class ChatUseCase {
         let memoryIndex = '';
         try {
             const memoryPath = path.join(__dirname, '../../../MEMORY.md');
+            if (!fs.existsSync(memoryPath)) {
+                fs.writeFileSync(memoryPath, DEFAULT_MEMORY_TEMPLATE, 'utf-8');
+            }
             if (fs.existsSync(memoryPath)) {
                 memoryIndex = fs.readFileSync(memoryPath, 'utf-8');
                 if (process.env.DEBUG === 'true') {
@@ -118,18 +133,7 @@ class ChatUseCase {
             }
         } catch (e) { /* Ignore */ }
 
-        const defaultInstructions = `Você é o motor cognitivo do Codexia, um terminal avançado para Codex e Chat.
-MODELO ATUAL: ${model}
-
-Você possui comandos especiais que o usuário executa:
-- /read <caminho>: Lê um arquivo ou lista um diretório.
-- /fetch <url>: Busca conteúdo web.
-- /run <automation>: Executa tarefas YAML.
-- /paste: Modo de colagem múltipla.
-
-Quando o usuário usa /read em uma pasta, eu injetarei a lista de arquivos para você. Use essa informação para ajudar o usuário a navegar e analisar o código. Suas respostas devem ser precisas e você tem consciência situacional de que está rodando em um terminal Node.js.
-
-${memoryIndex ? `\n--- 🧠 MEMORY INDEX (Contexto Permanente) ---\n${memoryIndex}\n--------------------------------------------\n` : ''}`;
+        const defaultInstructions = buildDefaultInstructions(model, memoryIndex);
 
         const body = {
             model: model,
@@ -138,34 +142,7 @@ ${memoryIndex ? `\n--- 🧠 MEMORY INDEX (Contexto Permanente) ---\n${memoryInde
         };
 
         if (isCodex) {
-            const instructions = [
-                `# ROLE: ${this.state.currentModel} — Codexia Advanced Assistant`,
-                `Você é um assistente de engenharia altamente técnico e proativo operando no Codexia CLI.`,
-                `SEU OBJETIVO: Atuar como um AGENTE que não apenas resolve problemas, mas gerencia a própria memória de longo prazo do projeto para garantir continuidade.`,
-                
-                `## 🧠 AUTOGESTÃO DE MEMÓRIA (Disciplina Claude Code)`,
-                `Você é o CURADOR da memória do projeto. Sua tarefa é manter o arquivo \`MEMORY.md\` (Índice) e a pasta \`memory/\` (Tópicos) sempre atualizados.`,
-                `Sempre que houver um progresso significativo, uma decisão de arquitetura ou um bug complexo resolvido:`,
-                `1. Use o comando \`/write memory/topic-<contexto>-<data>.md\` para salvar os detalhes técnicos.`,
-                `2. Use o comando \`/write MEMORY.md\` para atualizar o índice com o novo ponteiro (máximo 150 chars/linha).`,
-                `3. Mantenha o índice conciso e denso.`,
-
-                `## 🛠️ COMANDOS DISPONÍVEIS (Modo Agente)`,
-                `- \`/write <path>\`: Use para criar ou atualizar arquivos (Memória, código, docs). O conteúdo deve vir imediatamente após o caminho.`,
-                `- \`/read <path>\`: Leia arquivos ou liste diretórios.`,
-                `- \`/fetch <url>\`: Busque conteúdo web para contexto.`,
-                `- \`/run <automation.yaml>\`: Execute fluxos de automação.`,
-
-                `## 📝 FORMATO DO ÍNDICE (MEMORY.md)`,
-                `Mantenha este padrão estrito:`,
-                `- [TAG:ID] Descrição curta — memory/topic-nome-data.md`,
-
-                `--- 🧠 MEMORY INDEX ATUAL (Contexto Permanente) ---`,
-                memoryIndex || "O índice de memória está vazio no momento.",
-                `--------------------------------------------------`,
-
-                `HISTÓRICO DA SESSÃO ATUAL:`,
-            ].join('\n');
+            const instructions = buildCodexInstructions(this.state.currentModel, memoryIndex);
 
             body.input = [
                 {

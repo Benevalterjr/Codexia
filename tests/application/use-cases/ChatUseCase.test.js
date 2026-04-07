@@ -10,6 +10,7 @@ const fs = require('fs');
 jest.mock('fs', () => ({
     existsSync: jest.fn(),
     readFileSync: jest.fn(),
+    writeFileSync: jest.fn(),
 }));
 
 describe('ChatUseCase Memory Injection', () => {
@@ -66,5 +67,21 @@ describe('ChatUseCase Memory Injection', () => {
         expect(deps.aiGateway.sendMessage).toHaveBeenCalled();
         const instructions = deps.aiGateway.sendMessage.mock.calls[0][1].instructions;
         expect(instructions).not.toContain('--- 🧠 MEMORY INDEX');
+    });
+
+    test('deve criar MEMORY.md com template padrão quando não existir', async () => {
+        fs.existsSync
+            .mockReturnValueOnce(false) // primeira verificação: arquivo não existe
+            .mockReturnValueOnce(true); // segunda verificação: já criado
+        fs.readFileSync.mockReturnValue('# MEMORY Index\n\n- [INIT:0001] Bootstrap');
+        deps.aiGateway.sendMessage.mockResolvedValue({ stream: {} });
+
+        await uc.sendMessage('token_123', 'Olá');
+
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+            expect.stringContaining('MEMORY.md'),
+            expect.stringContaining('# MEMORY Index'),
+            'utf-8'
+        );
     });
 });
