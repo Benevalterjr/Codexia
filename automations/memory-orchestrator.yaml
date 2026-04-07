@@ -1,0 +1,87 @@
+name: memory-orchestrator
+description: >
+  Orquestra memória técnica com orçamento de contexto (baixo uso de tokens).
+  Atualiza tópico canônico e, depois, o índice MEMORY.md.
+
+inputs:
+  - name: trigger
+    required: true
+    description: "Motivo do registro (ex: hotfix chat.js, decisão de arquitetura)"
+  - name: tag
+    required: true
+    description: "Tag no formato AREA:ID (ex: OPS:MEMORY, FIX:CHAT, SEC:TOKEN)"
+  - name: summary
+    required: true
+    description: "Resumo curto do que mudou (1-3 frases)"
+  - name: impact
+    required: false
+    description: "Impacto técnico/operacional"
+  - name: risks
+    required: false
+    description: "Riscos e trade-offs"
+  - name: next_steps
+    required: false
+    description: "Próximos passos objetivos"
+  - name: topic_file
+    required: true
+    description: "Arquivo de tópico alvo em memory/, ex: memory/topic-memory-orchestrator-20260407.md"
+  - name: index_file
+    required: false
+    default: "MEMORY.md"
+    description: "Arquivo índice"
+
+policy:
+  context_budget:
+    max_lines_per_update: 25
+    avoid_long_logs: true
+    avoid_full_code_blocks: true
+    update_existing_topic_first: true
+    write_only_if_decision_affects_future: true
+
+steps:
+  - id: validate_inputs
+    action: assert
+    checks:
+      - "topic_file startsWith 'memory/'"
+      - "index_file != ''"
+      - "tag matches '^[A-Z]+:[A-Z0-9_-]+$'"
+
+  - id: compose_topic_patch
+    action: generate_markdown
+    output: topic_content
+    template: |
+      # [{{tag}}] {{trigger}} ({{date:YYYY-MM-DD}})
+
+      ## Contexto
+      {{summary}}
+
+      ## Impacto técnico
+      {{impact | default('N/A')}}
+
+      ## Riscos / Trade-offs
+      {{risks | default('N/A')}}
+
+      ## Próximos passos
+      {{next_steps | default('- Monitorar resultados e atualizar se necessário.')}}
+
+      ## Política de contexto
+      - Registro objetivo (sem logs longos e sem código completo).
+      - Priorizar atualização do tópico canônico.
+      - Só registrar se afetar decisões futuras.
+
+  - id: write_topic_first
+    action: write_file
+    path: "{{topic_file}}"
+    content_from: topic_content
+    mode: overwrite
+
+  - id: ensure_index_entry
+    action: upsert_line
+    path: "{{index_file}}"
+    section: "## 📌 TÓPICOS ATIVOS"
+    line: "- [{{tag}}] {{trigger}} — {{topic_file}}"
+    unique_by_prefix: "- [{{tag}}]"
+
+  - id: done
+    action: print
+    message: "MemoryOrchestrator executado: tópico atualizado e índice sincronizado."

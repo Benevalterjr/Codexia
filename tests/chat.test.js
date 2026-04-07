@@ -301,7 +301,7 @@ describe('createApp', () => {
             deps.authGateway.requestUserCode.mockResolvedValue({
                 user_code: 'ABC-123',
                 device_auth_id: 'dev_1',
-                interval: 0,
+                interval: 1,
             });
             deps.authGateway.pollForToken.mockResolvedValue({
                 authorization_code: 'auth_code',
@@ -329,7 +329,7 @@ describe('createApp', () => {
             deps.authGateway.requestUserCode.mockResolvedValue({
                 user_code: 'TEST-CODE',
                 device_auth_id: 'dev_123',
-                interval: 0,
+                interval: 1,
             });
             deps.authGateway.pollForToken.mockResolvedValue({
                 authorization_code: 'auth_xyz',
@@ -363,7 +363,7 @@ describe('createApp', () => {
             deps.authGateway.requestUserCode.mockResolvedValue({
                 usercode: 'ALT-CODE',
                 device_auth_id: 'dev_alt',
-                interval: '0', // String interval — testa parseInt
+                interval: '1', // String interval — testa parseInt
             });
             deps.authGateway.pollForToken.mockResolvedValue({
                 authorization_code: 'auth_alt',
@@ -387,7 +387,7 @@ describe('createApp', () => {
             deps.authGateway.requestUserCode.mockResolvedValue({
                 user_code: 'TEST-CODE',
                 device_auth_id: 'dev_123',
-                interval: 0,
+                interval: 1,
             });
             
             // Simular erro 401 no primeiro poll
@@ -650,7 +650,7 @@ describe('createApp', () => {
             expect(hasPreviewLog).toBe(true);
         });
 
-        test('deve detectar comando agentic /write no formato inline (/write path + conteúdo)', async () => {
+        test('deve ignorar /write inline para evitar falso positivo', async () => {
             deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
             const agenticInline = '/write ../inline.md\nLinha 1\nLinha 2';
             const mockStream = createMockStream([
@@ -664,10 +664,10 @@ describe('createApp', () => {
 
             const logCalls = logSpy.mock.calls.map(call => call[0]);
             const hasAgentLog = logCalls.some(log => log.includes('AGENTE:') && log.includes('../inline.md'));
-            expect(hasAgentLog).toBe(true);
+            expect(hasAgentLog).toBe(false);
         });
 
-        test('deve detectar comando /write dentro de bloco ```bash```', async () => {
+        test('deve detectar comando /write dentro de bloco ```bash``` e solicitar autorização exatamente 1 vez', async () => {
             deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
             const payload = '```bash\n/write ../bash-write.md\nconteudo vindo do bloco bash\n```';
             const mockStream = createMockStream([
@@ -682,11 +682,30 @@ describe('createApp', () => {
             const logCalls = logSpy.mock.calls.map(call => call[0]);
             const hasAgentLog = logCalls.some(log => log.includes('AGENTE:') && log.includes('../bash-write.md'));
             expect(hasAgentLog).toBe(true);
+            // REGRESSION: autorização deve ser pedida exatamente 1 vez (sem duplicação)
+            expect(mockRl.question).toHaveBeenCalledTimes(1);
+        });
+
+        test('deve deduplicar /write para o mesmo path em formatos diferentes', async () => {
+            deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
+            // Mesmo path em dois formatos: ```bash /write e ```write
+            const payload = '```bash\n/write memory/dup.md\nconteudo bash\n```\n\n```write memory/dup.md\nconteudo write\n```';
+            const mockStream = createMockStream([
+                `data: {"type":"response.output_text.delta","delta":${JSON.stringify(payload)}}\n`,
+                'data: [DONE]\n',
+            ]);
+            deps.chatUseCase.sendMessage.mockResolvedValue({ stream: mockStream });
+            mockRl.question = jest.fn((q, cb) => cb('y'));
+
+            await app.processInput('teste dedup', mockRl);
+
+            // Deve solicitar autorização apenas 1 vez (deduplicado por path)
+            expect(mockRl.question).toHaveBeenCalledTimes(1);
         });
 
         test('deve ignorar path inválido de /write sugerido pelo agente', async () => {
             deps.chatUseCase.ensureValidToken.mockResolvedValue('tok_valid');
-            const payload = '/write <path>\nconteudo invalido';
+            const payload = '```write <path>\nconteudo invalido\n```';
             const mockStream = createMockStream([
                 `data: {"type":"response.output_text.delta","delta":${JSON.stringify(payload)}}\n`,
                 'data: [DONE]\n',
