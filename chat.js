@@ -271,18 +271,21 @@ ${C.bold}Estado dos Tokens:${C.reset}
 
             // AGENTIC: Detetar se a IA quer escrever arquivos (Memória Autônoma)
             // Utiliza blocos delimitados: ```write <path>\n<conteúdo>\n```
-            const writeRegex = /```write\s+([a-zA-Z0-9\/\._\-\\]+)\n([\s\S]*?)\n```/g;
+            const writeRegex = /```write\s+([^\n]+)\n([\s\S]*?)\n```/g;
             let match;
             
             while ((match = writeRegex.exec(resp.text)) !== null) {
-                let targetPath = match[1];
+                let targetSpec = match[1].trim();
                 let content = match[2]; // Capturado puramente até o fechamento do bloco
                 
                 // Limpeza extrema: remover pontuação final acidental do path
-                targetPath = targetPath.replace(/[\.\)\,\?\!]+$/, '');
+                targetSpec = targetSpec.replace(/[\.\)\,\?\!]+$/, '');
+                const pathTokens = targetSpec.split(/\s+/).filter(Boolean);
+                const targetPath = pathTokens[0];
+                const pathHasForceFlag = pathTokens.includes('--force');
                 
                 // Remover flags se existirem (ex: --force)
-                const isForce = content.includes('--force');
+                const isForce = pathHasForceFlag || content.includes('--force');
                 content = content.replace('--force', '').trim();
 
                 console.log(`\n${C.magenta}${C.bold}🤖 AGENTE:${C.reset} A IA deseja escrever em: ${C.bold}${targetPath}${C.reset}`);
@@ -292,7 +295,8 @@ ${C.bold}Estado dos Tokens:${C.reset}
                 if (confirm.toLowerCase() === 'y') {
                     await handleCommand('/write', [targetPath, isForce ? '--force' : ''].filter(Boolean), rl, appState, {
                         ...ctx,
-                        content
+                        content,
+                        confirmWrite: async () => true
                     });
                 } else {
                     console.log(`${C.red}✗ Escrita recusada.${C.reset}\n`);
