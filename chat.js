@@ -6,8 +6,6 @@
  */
 
 const readline = require('readline');
-const fs = require('fs');
-const path = require('path');
 
 // Dominio e Infra
 const { C, CONFIG } = require('./src/domain/constants');
@@ -149,16 +147,12 @@ function createApp(deps) {
         const writes = [];
         const commandBlockRegex = /```(?:bash|sh)?\s*\n\/write\s+([^\n]+)\n([\s\S]*?)\n```/g;
         const fencedRegex = /```write\s+([^\n]+)\n([\s\S]*?)\n```/g;
-        const inlineRegex = /(?:^|\n)\/write\s+([^\n]+)\n([\s\S]*?)(?=\n\/write\s+[^\n]+\n|$)/g;
 
         let match;
         while ((match = commandBlockRegex.exec(text)) !== null) {
             writes.push({ targetSpec: match[1], content: match[2] });
         }
         while ((match = fencedRegex.exec(text)) !== null) {
-            writes.push({ targetSpec: match[1], content: match[2] });
-        }
-        while ((match = inlineRegex.exec(text)) !== null) {
             writes.push({ targetSpec: match[1], content: match[2] });
         }
 
@@ -196,7 +190,7 @@ ${C.bold}Estado dos Tokens:${C.reset}
             const parsedInterval = typeof ucData.interval === 'string'
                 ? Number.parseInt(ucData.interval, 10)
                 : Number(ucData.interval);
-            const interval = Number.isFinite(parsedInterval) && parsedInterval >= 0 ? parsedInterval : 5;
+            const interval = Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : 5;
             
             console.log(`╭──────────────────────────────────────────────╮`);
             console.log(`│  ${C.bold}1.${C.reset} Abra: ${C.cyan}https://auth.openai.com/codex/device${C.reset}  │`);
