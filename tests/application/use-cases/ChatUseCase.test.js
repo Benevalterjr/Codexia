@@ -1,7 +1,8 @@
 /**
  * 🧪 Codexia — Testes da Memória (ChatUseCase)
  * 
- * Verifica se o MEMORY.md é injetado corretamente nas instruções.
+ * Verifica se o sistema de memória é inicializado e injetado corretamente.
+ * Cobre: auto-criação de memory/, topic-bootstrap.md e MEMORY.md.
  */
 
 const ChatUseCase = require('../../../src/application/use-cases/ChatUseCase');
@@ -11,6 +12,7 @@ jest.mock('fs', () => ({
     existsSync: jest.fn(),
     readFileSync: jest.fn(),
     writeFileSync: jest.fn(),
+    mkdirSync: jest.fn(),
 }));
 
 describe('ChatUseCase Memory Injection', () => {
@@ -29,6 +31,7 @@ describe('ChatUseCase Memory Injection', () => {
 
     test('deve injetar o conteúdo do MEMORY.md nas instruções quando o arquivo existir', async () => {
         const fakeMemory = "# Test Memory Index\n- [T1] Topic 1 : memory/t1.md";
+        // memoryDir exists, bootstrapPath exists, memoryPath exists
         fs.existsSync.mockReturnValue(true);
         fs.readFileSync.mockReturnValue(fakeMemory);
         
@@ -46,7 +49,10 @@ describe('ChatUseCase Memory Injection', () => {
     });
 
     test('não deve injetar bloco de memória quando o MEMORY.md não existir', async () => {
+        // memoryDir exists, bootstrap exists, memoryPath not exists -> write creates it
+        // but readFileSync will throw to simulate total failure
         fs.existsSync.mockReturnValue(false);
+        fs.readFileSync.mockImplementation(() => { throw new Error('File not found'); });
         deps.aiGateway.sendMessage.mockResolvedValue({ stream: {} });
 
         await uc.sendMessage('token_123', 'Olá');
@@ -70,18 +76,64 @@ describe('ChatUseCase Memory Injection', () => {
     });
 
     test('deve criar MEMORY.md com template padrão quando não existir', async () => {
+        // memoryDir exists, bootstrap exists, memoryPath does NOT exist
         fs.existsSync
-            .mockReturnValueOnce(false) // primeira verificação: arquivo não existe
-            .mockReturnValueOnce(true); // segunda verificação: já criado
-        fs.readFileSync.mockReturnValue('# MEMORY Index\n\n- [INIT:0001] Bootstrap');
+            .mockReturnValueOnce(true)   // memoryDir exists
+            .mockReturnValueOnce(true)   // bootstrapPath exists
+            .mockReturnValueOnce(false); // memoryPath does NOT exist -> triggers write
+        fs.readFileSync.mockReturnValue('# 🧠 CODEXIA MEMORY INDEX\n\n- [INIT:BOOT] Bootstrap');
         deps.aiGateway.sendMessage.mockResolvedValue({ stream: {} });
 
         await uc.sendMessage('token_123', 'Olá');
 
         expect(fs.writeFileSync).toHaveBeenCalledWith(
             expect.stringContaining('MEMORY.md'),
-            expect.stringContaining('# MEMORY Index'),
+            expect.stringContaining('CODEXIA MEMORY INDEX'),
             'utf-8'
+        );
+    });
+
+    test('deve criar pasta memory/ e bootstrap na primeira execução', async () => {
+        // Nada existe -> tudo é criado
+        fs.existsSync.mockReturnValue(false);
+        fs.readFileSync.mockReturnValue('# 🧠 CODEXIA MEMORY INDEX');
+        deps.aiGateway.sendMessage.mockResolvedValue({ stream: {} });
+
+        await uc.sendMessage('token_123', 'Olá');
+
+        // Deve criar o diretório
+        expect(fs.mkdirSync).toHaveBeenCalledWith(
+            expect.stringContaining('memory'),
+            { recursive: true }
+        );
+        // Deve criar o bootstrap topic
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+            expect.stringContaining('topic-bootstrap.md'),
+            expect.stringContaining('Bootstrap do Sistema de Memória'),
+            'utf-8'
+        );
+        // Deve criar o MEMORY.md
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+            expect.stringContaining('MEMORY.md'),
+            expect.stringContaining('CODEXIA MEMORY INDEX'),
+            'utf-8'
+        );
+    });
+
+    test('não deve recriar bootstrap se já existir', async () => {
+        // memoryDir exists, bootstrapPath exists, memoryPath exists
+        fs.existsSync.mockReturnValue(true);
+        fs.readFileSync.mockReturnValue('# Existing Memory');
+        deps.aiGateway.sendMessage.mockResolvedValue({ stream: {} });
+
+        await uc.sendMessage('token_123', 'Olá');
+
+        // Não deve ter criado diretório nem escrito bootstrap
+        expect(fs.mkdirSync).not.toHaveBeenCalled();
+        expect(fs.writeFileSync).not.toHaveBeenCalledWith(
+            expect.stringContaining('topic-bootstrap.md'),
+            expect.anything(),
+            expect.anything()
         );
     });
 });

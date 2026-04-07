@@ -3,15 +3,45 @@ const fs = require('fs');
 const path = require('path');
 const { buildDefaultInstructions, buildCodexInstructions } = require('../PromptBuilder');
 
-const DEFAULT_MEMORY_TEMPLATE = `# MEMORY Index
+const DEFAULT_MEMORY_TEMPLATE = `# 🧠 CODEXIA MEMORY INDEX
 
-Use este arquivo como índice de conhecimento persistente do projeto.
+Este arquivo é o índice de contexto permanente do Codexia.
+Use as tags para localizar rapidamente os tópicos em \`memory/\`.
 
-## Convenção de entradas
-- [TAG:ID] Descrição curta — memory/topic-nome-data.md
+> **Política**: Escrever tópico primeiro, depois atualizar este índice.
+> Cada linha ≤ 150 chars. Sem código, sem logs.
 
-## Tópicos
-- [INIT:0001] Bootstrap do índice de memória — memory/topic-bootstrap-0001.md
+## 📌 TÓPICOS ATIVOS
+
+- [INIT:BOOT] Bootstrap do sistema de memória — memory/topic-bootstrap.md
+
+## 📜 HISTÓRICO DE SESSÕES (Grep-only)
+
+_(Sessões serão registradas aqui automaticamente)_
+
+---
+Disciplina: escrever tópico primeiro, depois atualizar este índice.
+`;
+
+const DEFAULT_BOOTSTRAP_TOPIC = `# [INIT:BOOT] Bootstrap do Sistema de Memória
+
+## Contexto
+Este é o primeiro tópico de memória do Codexia, criado automaticamente na inicialização.
+O sistema de memória permite que a IA mantenha continuidade entre sessões.
+
+## Como funciona
+1. **MEMORY.md** — Índice compacto com ponteiros para tópicos detalhados.
+2. **memory/** — Pasta com tópicos individuais (um arquivo por assunto).
+3. A IA usa o comando \`/write\` para criar/atualizar tópicos e o índice.
+
+## Convenções
+- Tags no formato \`[AREA:ID]\` (ex: \`[SEC:TOKEN]\`, \`[FIX:CHAT]\`).
+- Nomes de arquivo: \`topic-<contexto>-<data>.md\`.
+- Máximo de 25 linhas úteis por atualização de tópico.
+- Registrar apenas decisões que afetam o futuro do projeto.
+
+## Próximos passos
+- Usar o Codexia normalmente — a memória será populada organicamente.
 `;
 
 class ChatUseCase {
@@ -121,15 +151,25 @@ class ChatUseCase {
         const isCodex = model.endsWith('-codex') || model.startsWith('codex');
         let memoryIndex = '';
         try {
-            const memoryPath = path.join(__dirname, '../../../MEMORY.md');
+            const rootDir = path.join(__dirname, '../../..');
+            const memoryPath = path.join(rootDir, 'MEMORY.md');
+            const memoryDir = path.join(rootDir, 'memory');
+            const bootstrapPath = path.join(memoryDir, 'topic-bootstrap.md');
+
+            // Auto-criar estrutura de memória na primeira execução
+            if (!fs.existsSync(memoryDir)) {
+                fs.mkdirSync(memoryDir, { recursive: true });
+            }
+            if (!fs.existsSync(bootstrapPath)) {
+                fs.writeFileSync(bootstrapPath, DEFAULT_BOOTSTRAP_TOPIC, 'utf-8');
+            }
             if (!fs.existsSync(memoryPath)) {
                 fs.writeFileSync(memoryPath, DEFAULT_MEMORY_TEMPLATE, 'utf-8');
             }
-            if (fs.existsSync(memoryPath)) {
-                memoryIndex = fs.readFileSync(memoryPath, 'utf-8');
-                if (process.env.DEBUG === 'true') {
-                    console.log(`\n${CONFIG.C?.yellow || ''}[DEBUG] Memory Index injetado (${memoryIndex.length} bytes)${CONFIG.C?.reset || ''}`);
-                }
+
+            memoryIndex = fs.readFileSync(memoryPath, 'utf-8');
+            if (process.env.DEBUG === 'true') {
+                console.log(`\n${CONFIG.C?.yellow || ''}[DEBUG] Memory Index injetado (${memoryIndex.length} bytes)${CONFIG.C?.reset || ''}`);
             }
         } catch (e) { /* Ignore */ }
 

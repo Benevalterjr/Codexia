@@ -16,6 +16,10 @@ yarn-debug.log*
 yarn-error.log*
 *.log
 
+# Memória do usuário (gerada automaticamente, dados pessoais)
+memory/
+MEMORY.md
+
 # OS específicos
 .DS_Store
 Thumbs.db
