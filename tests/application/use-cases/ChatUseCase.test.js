@@ -13,6 +13,7 @@ jest.mock('fs', () => ({
     readFileSync: jest.fn(),
     writeFileSync: jest.fn(),
     mkdirSync: jest.fn(),
+    appendFileSync: jest.fn(),
 }));
 
 describe('ChatUseCase Memory Injection', () => {
@@ -76,11 +77,10 @@ describe('ChatUseCase Memory Injection', () => {
     });
 
     test('deve criar MEMORY.md com template padrão quando não existir', async () => {
-        // memoryDir exists, bootstrap exists, memoryPath does NOT exist
-        fs.existsSync
-            .mockReturnValueOnce(true)   // memoryDir exists
-            .mockReturnValueOnce(true)   // bootstrapPath exists
-            .mockReturnValueOnce(false); // memoryPath does NOT exist -> triggers write
+        fs.existsSync.mockImplementation((targetPath) => {
+            if (targetPath.includes('MEMORY.md')) return false;
+            return true;
+        });
         fs.readFileSync.mockReturnValue('# 🧠 CODEXIA MEMORY INDEX\n\n- [INIT:BOOT] Bootstrap');
         deps.aiGateway.sendMessage.mockResolvedValue({ stream: {} });
 
@@ -120,6 +120,38 @@ describe('ChatUseCase Memory Injection', () => {
         );
     });
 
+    test('deve gravar transcrições em JSONL ao atualizar estado', async () => {
+        fs.existsSync.mockReturnValue(true);
+        await uc.updateStateFromResponse('pergunta', 'resposta', 'resp_1', 'tok');
+
+        expect(fs.appendFileSync).toHaveBeenCalledWith(
+            expect.stringContaining('sessions.jsonl'),
+            expect.stringContaining('"user":"pergunta"'),
+            'utf-8'
+        );
+    });
+
+    test('deve executar autoDream e criar tópico consolidado', async () => {
+        jest.useFakeTimers();
+        fs.existsSync.mockImplementation((targetPath) => targetPath.includes('sessions.jsonl') || targetPath.includes('MEMORY.md'));
+        fs.readFileSync.mockImplementation((targetPath) => {
+            if (targetPath.includes('sessions.jsonl')) {
+                return '{"user":"u1","assistant":"a1"}\n{"user":"u2","assistant":"a2"}\n';
+            }
+            return '# 🧠 CODEXIA MEMORY INDEX\n\n## 📌 TÓPICOS ATIVOS\n';
+        });
+
+        await uc.updateStateFromResponse('pergunta', 'resposta', 'resp_2', 'tok');
+        jest.runAllTimers();
+
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+            expect.stringContaining('topic-autodream-'),
+            expect.stringContaining('[AUTO:DREAM]'),
+            'utf-8'
+        );
+
+        jest.useRealTimers();
+    });
     test('não deve recriar bootstrap se já existir', async () => {
         // memoryDir exists, bootstrapPath exists, memoryPath exists
         fs.existsSync.mockReturnValue(true);
